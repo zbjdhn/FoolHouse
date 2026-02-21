@@ -20,8 +20,25 @@ except ImportError:
 
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+def _choose_dir(env_key: str, default_subdir: str) -> str:
+    env_path = os.environ.get(env_key)
+    if env_path:
+        try:
+            os.makedirs(env_path, exist_ok=True)
+            return env_path
+        except OSError:
+            pass
+    default_path = os.path.join(BASE_DIR, default_subdir)
+    try:
+        os.makedirs(default_path, exist_ok=True)
+        return default_path
+    except OSError:
+        tmp_path = os.path.join("/tmp", "foolhouse", default_subdir)
+        os.makedirs(tmp_path, exist_ok=True)
+        return tmp_path
+
+UPLOAD_DIR = _choose_dir("FOOLHOUSE_UPLOAD_DIR", "uploads")
 
 
 app = Flask(__name__)

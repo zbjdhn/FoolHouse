@@ -3,7 +3,25 @@ import os
 from typing import List, Tuple
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DATA_DIR = os.path.join(ROOT_DIR, "data")
+
+def _choose_data_dir() -> str:
+    env_path = os.environ.get("FOOLHOUSE_DATA_DIR")
+    if env_path:
+        try:
+            os.makedirs(env_path, exist_ok=True)
+            return env_path
+        except OSError:
+            pass
+    default_path = os.path.join(ROOT_DIR, "data")
+    try:
+        os.makedirs(default_path, exist_ok=True)
+        return default_path
+    except OSError:
+        tmp_path = os.path.join("/tmp", "foolhouse", "data")
+        os.makedirs(tmp_path, exist_ok=True)
+        return tmp_path
+
+DATA_DIR = _choose_data_dir()
 DATA_FILE = os.path.join(DATA_DIR, "trades.csv")
 CSV_HEADERS = ["owner", "date", "code", "name", "side", "price", "quantity", "amount", "amount_auto"]
 
