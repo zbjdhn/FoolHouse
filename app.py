@@ -3,13 +3,14 @@ from datetime import date, datetime
 import json
 from werkzeug.utils import secure_filename
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, session
 from io import BytesIO
 
 from stock_api import get_stock_info
 from validators.trade_rules import validate_and_build_trade as validate_trade
 from importers.excel_parser import parse_excel_file as parse_excel
 import services.trade_store as trade_store
+import services.user_store as user_store
 
 try:
     import pandas as pd
@@ -28,9 +29,63 @@ app.secret_key = "dev-secret-key-change-me"
 
 
 
+def require_login():
+    if not session.get("user"):
+        return redirect(url_for("login", next=request.path))
+    return None
+
+
+@app.before_request
+def _ensure_users():
+    user_store.ensure_users_file()
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip()
+        password = (request.form.get("password") or "").strip()
+        if user_store.verify_password(username, password):
+            session["user"] = username
+            session["is_admin"] = user_store.is_admin(username)
+            next_url = request.args.get("next") or url_for("list_trades")
+            return redirect(next_url)
+        else:
+            flash("用户名或密码错误")
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.route("/admin/users", methods=["GET", "POST"])
+def admin_users():
+    if not session.get("user"):
+        return redirect(url_for("login", next=request.path))
+    if not session.get("is_admin"):
+        flash("无权限")
+        return redirect(url_for("list_trades"))
+    message = ""
+    if request.method == "POST":
+        new_user = (request.form.get("username") or "").strip()
+        new_pwd = (request.form.get("password") or "").strip()
+        is_admin_flag = True if (request.form.get("is_admin") == "on") else False
+        if user_store.create_user(new_user, new_pwd, is_admin_flag):
+            message = "用户创建成功"
+        else:
+            message = "用户已存在或信息不完整"
+    users = user_store.list_users()
+    return render_template("admin_users.html", users=users, message=message)
+
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    need = require_login()
+    if need:
+        return need
     trade_store.ensure_data_file()
 
     errors: dict[str, str] = {}
@@ -60,6 +115,7 @@ def index():
 
         trade, errors = validate_trade(request.form)
         if not errors:
+            trade["owner"] = session.get("user")
             trade_store.append_trade(trade)
             flash("交易记录已保存。")
             return redirect(url_for("list_trades"))
@@ -69,13 +125,19 @@ def index():
 
 @app.route("/trades")
 def list_trades():
-    trades = trade_store.load_trades()
+    need = require_login()
+    if need:
+        return need
+    trades = trade_store.load_trades(owner=session.get("user"))
     return render_template("trades.html", trades=trades)
 
 
 @app.route("/clear", methods=["POST"])
 def clear_trades():
-    trade_store.clear_all_trades()
+    need = require_login()
+    if need:
+        return need
+    trade_store.clear_all_trades(owner=session.get("user"))
     flash("已清除所有历史交易数据。")
     return redirect(url_for("list_trades"))
 
@@ -83,10 +145,12 @@ def clear_trades():
 @app.route("/edit/<int:index>", methods=["GET", "POST"])
 def edit_trade(index: int):
     """Edit a trade record by its display index."""
+    need = require_login()
+    if need:
+        return need
     trade_store.ensure_data_file()
     
-    # 获取原始索引和交易数据
-    orig_index, trade = trade_store.get_trade_by_display_index(index)
+    orig_index, trade = trade_store.get_trade_by_display_index(index, owner=session.get("user"))
     
     if orig_index is None:
         flash("交易记录不存在。")
@@ -122,6 +186,7 @@ def edit_trade(index: int):
         
         updated_trade, errors = validate_trade(request.form)
         if not errors:
+            updated_trade["owner"] = session.get("user")
             if trade_store.update_trade_by_index(orig_index, updated_trade):
                 flash("交易记录已更新。")
                 return redirect(url_for("list_trades"))
@@ -134,7 +199,10 @@ def edit_trade(index: int):
 @app.route("/delete/<int:index>", methods=["POST"])
 def delete_trade(index: int):
     """Delete a trade record by its display index."""
-    orig_index, _ = trade_store.get_trade_by_display_index(index)
+    need = require_login()
+    if need:
+        return need
+    orig_index, _ = trade_store.get_trade_by_display_index(index, owner=session.get("user"))
     
     if orig_index is None:
         flash("交易记录不存在。")
@@ -158,13 +226,15 @@ def api_get_stock(code: str):
 @app.route("/export")
 def export_trades():
     """导出所有交易记录为Excel文件"""
+    need = require_login()
+    if need:
+        return need
     if not PANDAS_AVAILABLE:
         flash("导出功能需要pandas库，请运行: pip install pandas openpyxl")
         return redirect(url_for("list_trades"))
     
     try:
-        # 加载所有交易记录
-        trades = trade_store.load_trades()
+        trades = trade_store.load_trades(owner=session.get("user"))
         
         if not trades:
             flash("没有交易记录可导出。")
@@ -240,6 +310,9 @@ def export_trades():
 @app.route("/import", methods=["GET", "POST"])
 def import_trades():
     """批量导入交易记录"""
+    need = require_login()
+    if need:
+        return need
     if request.method == "GET":
         return render_template("import.html")
     
@@ -264,7 +337,6 @@ def import_trades():
     file.save(file_path)
     
     try:
-        # 解析Excel
         trades, errors, summary = parse_excel(file_path)
         
         if "error" in summary:
@@ -280,6 +352,7 @@ def import_trades():
                     trade_dict["amount_auto"] = "1"
                 else:
                     trade_dict["amount_auto"] = "0"
+                trade_dict["owner"] = session.get("user")
                 trade_store.append_trade(trade_dict)
                 success_count += 1
         

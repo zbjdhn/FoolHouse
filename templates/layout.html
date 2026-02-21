@@ -39,6 +39,25 @@
               <a class="nav-link{% if request.endpoint == 'list_trades' %} active{% endif %}" href="{{ url_for('list_trades') }}">交易列表</a>
             </li>
           </ul>
+          <ul class="navbar-nav ms-auto">
+            {% if session.get('user') %}
+              {% if session.get('is_admin') %}
+              <li class="nav-item">
+                <a class="nav-link{% if request.endpoint == 'admin_users' %} active{% endif %}" href="{{ url_for('admin_users') }}">用户管理</a>
+              </li>
+              {% endif %}
+              <li class="nav-item">
+                <span class="navbar-text me-3">您好，{{ session.get('user') }}</span>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('logout') }}">退出</a>
+              </li>
+            {% else %}
+              <li class="nav-item">
+                <a class="nav-link{% if request.endpoint == 'login' %} active{% endif %}" href="{{ url_for('login') }}">登录</a>
+              </li>
+            {% endif %}
+          </ul>
         </div>
       </div>
     </nav>
