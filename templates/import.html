@@ -1,0 +1,84 @@
+{% extends "layout.html" %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>批量导入交易记录</span>
+          <a href="{{ url_for('list_trades') }}" class="btn btn-sm btn-outline-secondary">返回列表</a>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info">
+            <h6 class="alert-heading">Excel文件格式要求：</h6>
+            <ul class="mb-0">
+              <li>文件格式：支持 .xlsx 或 .xls 格式</li>
+              <li>第一行必须是表头（列名）</li>
+              <li>必需的列（列名不区分大小写，支持以下任意一种命名）：</li>
+              <ul>
+                <li><strong>成交日期</strong>：成交日期、日期、date、交易日期、成交日</li>
+                <li><strong>证券代码</strong>：证券代码、代码、code、股票代码、证券</li>
+                <li><strong>买卖标志</strong>：买卖标志、买卖方向、方向、side、交易方向、类型（值：证券买入/证券卖出/配售申购/红股入账，也支持：买入/卖出/买/卖等简写）</li>
+                <li><strong>成交价格</strong>：成交价格、价格、price、单价</li>
+                <li><strong>成交数量</strong>：成交数量、数量、quantity、股数、数量(股)</li>
+                <li><strong>发生金额</strong>：发生金额、金额、amount、总金额、金额(元)</li>
+              </ul>
+              <li>Excel文件中可以包含其他列，系统会自动识别匹配的列</li>
+              <li>列的顺序可以任意，系统会根据列名自动匹配</li>
+            </ul>
+          </div>
+
+          <form method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+              <label for="file" class="form-label">选择Excel文件</label>
+              <input
+                type="file"
+                class="form-control"
+                id="file"
+                name="file"
+                accept=".xlsx,.xls"
+                required
+              />
+              <div class="form-text">
+                支持 .xlsx 和 .xls 格式的Excel文件
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-upload"></i> 开始导入
+            </button>
+            <a href="{{ url_for('list_trades') }}" class="btn btn-secondary">取消</a>
+          </form>
+
+          {% if errors %}
+            <div class="mt-4">
+              <h5>导入结果</h5>
+              {% if summary %}
+                <div class="alert alert-{% if summary.error_count == 0 %}success{% else %}warning{% endif %}">
+                  <strong>总计：</strong>{{ summary.total_rows }} 行
+                  {% if summary.success_count > 0 %}
+                    | <strong>成功：</strong>{{ summary.success_count }} 条
+                  {% endif %}
+                  {% if summary.error_count > 0 %}
+                    | <strong>错误：</strong>{{ summary.error_count }} 条
+                  {% endif %}
+                </div>
+              {% endif %}
+
+              {% if errors|length > 0 %}
+                <div class="alert alert-danger">
+                  <h6 class="alert-heading">错误详情：</h6>
+                  <ul class="mb-0" style="max-height: 300px; overflow-y: auto;">
+                    {% for error in errors %}
+                      <li>{{ error }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

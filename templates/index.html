@@ -1,0 +1,339 @@
+{% extends "layout.html" %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-6">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>新增交易</span>
+          <a href="{{ url_for('import_trades') }}" class="btn btn-sm btn-outline-secondary">批量导入</a>
+        </div>
+        <div class="card-body">
+          <form method="post" novalidate>
+            <div class="row mb-3">
+              <div class="col-12">
+                <label for="code" class="form-label">证券代码</label>
+                <input
+                  type="text"
+                  class="form-control{% if errors.code %} is-invalid{% endif %}"
+                  id="code"
+                  name="code"
+                  value="{{ form_data.code }}"
+                  placeholder="如：600000"
+                  required
+                />
+                <div id="stock-info" class="mt-2 px-2 py-1 bg-light rounded" style="display: none;">
+                  <span class="text-muted" style="font-size: 0.75rem;">证券名称：</span>
+                  <span id="stock-name" class="fw-semibold text-dark" style="font-size: 0.75rem;"></span>
+                  <span class="text-muted ms-2" style="font-size: 0.75rem;">当前价格：</span>
+                  <span id="stock-price" class="fw-bold text-primary" style="font-size: 0.75rem;"></span>
+                </div>
+                <input type="hidden" id="name" name="name" value="{{ form_data.name or '' }}">
+                <div id="stock-error" class="mt-2" style="display: none;">
+                  <small class="text-danger" id="stock-error-text"></small>
+                </div>
+                {% if errors.code %}
+                  <div class="invalid-feedback d-block">
+                    {{ errors.code }}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="date" class="form-label">成交日期</label>
+                <input
+                  type="date"
+                  class="form-control{% if errors.date %} is-invalid{% endif %}"
+                  id="date"
+                  name="date"
+                  value="{{ form_data.date }}"
+                  style="font-size: 0.875rem;"
+                  required
+                />
+                {% if errors.date %}
+                  <div class="invalid-feedback d-block">
+                    {{ errors.date }}
+                  </div>
+                {% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="side" class="form-label">买卖标志</label>
+                <select
+                  id="side"
+                  name="side"
+                  class="form-select{% if errors.side %} is-invalid{% endif %}"
+                  required
+                >
+                  <option value="">请选择</option>
+                  <option value="证券买入" {% if form_data.side == "证券买入" %}selected{% endif %}>证券买入</option>
+                  <option value="证券卖出" {% if form_data.side == "证券卖出" %}selected{% endif %}>证券卖出</option>
+                  <option value="配售申购" {% if form_data.side == "配售申购" %}selected{% endif %}>配售申购</option>
+                  <option value="红股入账" {% if form_data.side == "红股入账" %}selected{% endif %}>红股入账</option>
+                </select>
+                {% if errors.side %}
+                  <div class="invalid-feedback d-block">
+                    {{ errors.side }}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label for="price" class="form-label">成交价格</label>
+            <input
+              type="number"
+              step="0.0001"
+              class="form-control{% if errors.price %} is-invalid{% endif %}"
+              id="price"
+              name="price"
+              value="{{ form_data.price }}"
+              required
+            />
+            {% if errors.price %}
+              <div class="invalid-feedback d-block">
+                {{ errors.price }}
+              </div>
+            {% endif %}
+          </div>
+          <div class="col-md-6">
+            <label for="quantity" class="form-label">成交数量</label>
+            <input
+              type="number"
+              step="1"
+              class="form-control{% if errors.quantity %} is-invalid{% endif %}"
+              id="quantity"
+              name="quantity"
+              value="{{ form_data.quantity }}"
+              required
+            />
+            {% if errors.quantity %}
+              <div class="invalid-feedback d-block">
+                {{ errors.quantity }}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-12">
+            <label for="amount" class="form-label">发生金额 <span class="text-danger">*</span></label>
+            <input
+              type="number"
+              step="0.01"
+              class="form-control{% if errors.amount %} is-invalid{% endif %}"
+              id="amount"
+              name="amount"
+              value="{{ form_data.amount }}"
+              required
+            />
+            <div class="form-text">
+              扣除手续费后的实际发生金额。将根据 价格 × 数量 自动计算，您也可以手动修改。
+            </div>
+            {% if errors.amount %}
+              <div class="invalid-feedback d-block">
+                {{ errors.amount }}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          保存交易
+        </button>
+      </form>
+      <script>
+        document.addEventListener("DOMContentLoaded", function () {
+          var codeInput = document.getElementById("code");
+          var priceInput = document.getElementById("price");
+          var quantityInput = document.getElementById("quantity");
+          var amountInput = document.getElementById("amount");
+          var sideSelect = document.getElementById("side");
+          var stockInfo = document.getElementById("stock-info");
+          var stockName = document.getElementById("stock-name");
+          var stockPrice = document.getElementById("stock-price");
+          var stockError = document.getElementById("stock-error");
+          var stockErrorText = document.getElementById("stock-error-text");
+          
+          if (!codeInput || !priceInput || !quantityInput || !amountInput) {
+            return;
+          }
+
+          // 股票代码查询相关
+          var stockQueryTimeout = null;
+          var lastQueriedCode = ""; // 记录上次查询的代码，避免重复查询
+          
+          function triggerStockQuery(code) {
+            code = code.trim();
+            
+            // 如果代码为空或长度不够，不查询
+            if (code.length < 4) {
+              return;
+            }
+            
+            // 如果和上次查询的代码相同，不重复查询
+            if (code === lastQueriedCode) {
+              return;
+            }
+            
+            // 清除之前的定时器
+            if (stockQueryTimeout) {
+              clearTimeout(stockQueryTimeout);
+            }
+            
+            // 隐藏之前的信息
+            stockInfo.style.display = "none";
+            stockError.style.display = "none";
+            
+            // 立即查询（不延迟）
+            fetchStockInfo(code);
+            lastQueriedCode = code;
+          }
+          
+          function delayedStockQuery(code) {
+            code = code.trim();
+            
+            // 如果代码为空或长度不够，不查询
+            if (code.length < 4) {
+              return;
+            }
+            
+            // 如果和上次查询的代码相同，不重复查询
+            if (code === lastQueriedCode) {
+              return;
+            }
+            
+            // 清除之前的定时器
+            if (stockQueryTimeout) {
+              clearTimeout(stockQueryTimeout);
+            }
+            
+            // 隐藏之前的信息
+            stockInfo.style.display = "none";
+            stockError.style.display = "none";
+            
+            // 延迟查询，避免频繁请求
+            stockQueryTimeout = setTimeout(function() {
+              fetchStockInfo(code);
+              lastQueriedCode = code;
+            }, 500);
+          }
+          
+          // 监听输入事件（延迟查询）
+          codeInput.addEventListener("input", function() {
+            delayedStockQuery(codeInput.value);
+          });
+          
+          // 监听回车键（立即查询，并阻止表单提交）
+          codeInput.addEventListener("keydown", function(e) {
+            if (e.key === "Enter" || e.keyCode === 13) {
+              e.preventDefault(); // 阻止表单提交
+              triggerStockQuery(codeInput.value);
+            }
+          });
+          
+          // 监听失去焦点事件（如果还没查询过，立即查询）
+          codeInput.addEventListener("blur", function() {
+            var code = codeInput.value.trim();
+            if (code.length >= 4 && code !== lastQueriedCode) {
+              triggerStockQuery(code);
+            }
+          });
+          
+          function fetchStockInfo(code) {
+            fetch("/api/stock/" + encodeURIComponent(code))
+              .then(function(response) {
+                return response.json();
+              })
+              .then(function(data) {
+                if (data.error) {
+                  // 显示错误信息
+                  stockErrorText.textContent = data.error;
+                  stockError.style.display = "block";
+                  stockInfo.style.display = "none";
+                  var nameHidden = document.getElementById("name");
+                  if (nameHidden) nameHidden.value = "";
+                } else if (data.name && data.current_price) {
+                  // 显示股票信息
+                  stockName.textContent = data.name;
+                  stockPrice.textContent = "¥" + parseFloat(data.current_price).toFixed(2);
+                  stockInfo.style.display = "block";
+                  stockError.style.display = "none";
+                  var nameHidden = document.getElementById("name");
+                  if (nameHidden) nameHidden.value = data.name;
+                  
+                  // 如果价格输入框为空，自动填充当前价格
+                  if (!priceInput.value || priceInput.value.trim() === "") {
+                    priceInput.value = data.current_price;
+                    // 触发金额计算
+                    updateAmount();
+                  }
+                } else {
+                  // 数据不完整
+                  stockErrorText.textContent = "未找到股票信息";
+                  stockError.style.display = "block";
+                  stockInfo.style.display = "none";
+                  var nameHidden = document.getElementById("name");
+                  if (nameHidden) nameHidden.value = "";
+                }
+              })
+              .catch(function(error) {
+                stockErrorText.textContent = "查询失败，请稍后重试";
+                stockError.style.display = "block";
+                stockInfo.style.display = "none";
+                var nameHidden = document.getElementById("name");
+                if (nameHidden) nameHidden.value = "";
+              });
+          }
+
+          // 根据买卖标志动态控制字段（红股入账价格与金额固定为0）
+          function updateFieldsForSide() {
+            var isBonus = sideSelect && sideSelect.value === "红股入账";
+            if (priceInput && amountInput) {
+              priceInput.required = !isBonus;
+              amountInput.required = !isBonus;
+              priceInput.disabled = isBonus;
+              amountInput.disabled = isBonus;
+              if (isBonus) {
+                priceInput.value = "0";
+                amountInput.value = "0";
+                amountInput.dataset.manual = "0";
+              }
+            }
+          }
+          if (sideSelect) {
+            sideSelect.addEventListener("change", function() {
+              updateFieldsForSide();
+            });
+            updateFieldsForSide();
+          }
+
+          // 金额自动计算
+          function updateAmount() {
+            if ((sideSelect && sideSelect.value === "红股入账") || amountInput.dataset.manual === "1") {
+              return;
+            }
+            var price = parseFloat(priceInput.value);
+            var quantity = parseFloat(quantityInput.value);
+            if (!isNaN(price) && !isNaN(quantity) && price > 0 && quantity > 0) {
+              var calculated = (price * quantity).toFixed(2);
+              amountInput.value = calculated;
+              // 清除手动标记，因为这是自动计算的
+              amountInput.dataset.manual = "0";
+            }
+          }
+
+          priceInput.addEventListener("input", updateAmount);
+          quantityInput.addEventListener("input", updateAmount);
+          amountInput.addEventListener("input", function () {
+            amountInput.dataset.manual = "1";
+          });
+        });
+      </script>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
