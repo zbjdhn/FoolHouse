@@ -85,3 +85,37 @@ def create_user(username: str, password: str, is_admin_flag: bool = False) -> bo
 
 def list_users() -> List[Dict]:
     return _load_users()
+
+
+def delete_user(username: str) -> tuple[bool, str]:
+    users = _load_users()
+    target = None
+    for u in users:
+        if u.get("username") == username:
+            target = u
+            break
+    if not target:
+        return False, "用户不存在"
+    if target.get("is_admin"):
+        admin_count = sum(1 for u in users if u.get("is_admin"))
+        if admin_count <= 1:
+            return False, "至少保留一个管理员"
+    users = [u for u in users if u.get("username") != username]
+    _save_users(users)
+    return True, "用户已删除"
+
+
+def update_password(username: str, new_password: str) -> tuple[bool, str]:
+    if not new_password:
+        return False, "密码不能为空"
+    users = _load_users()
+    updated = False
+    for u in users:
+        if u.get("username") == username:
+            u["password_hash"] = _hash(new_password)
+            updated = True
+            break
+    if not updated:
+        return False, "用户不存在"
+    _save_users(users)
+    return True, "密码已更新"

@@ -87,13 +87,27 @@ def admin_users():
         return redirect(url_for("list_trades"))
     message = ""
     if request.method == "POST":
-        new_user = (request.form.get("username") or "").strip()
-        new_pwd = (request.form.get("password") or "").strip()
-        is_admin_flag = True if (request.form.get("is_admin") == "on") else False
-        if user_store.create_user(new_user, new_pwd, is_admin_flag):
-            message = "用户创建成功"
-        else:
-            message = "用户已存在或信息不完整"
+        op = (request.form.get("op") or "create").strip()
+        if op == "create":
+            new_user = (request.form.get("username") or "").strip()
+            new_pwd = (request.form.get("password") or "").strip()
+            is_admin_flag = True if (request.form.get("is_admin") == "on") else False
+            if user_store.create_user(new_user, new_pwd, is_admin_flag):
+                message = "用户创建成功"
+            else:
+                message = "用户已存在或信息不完整"
+        elif op == "delete":
+            target = (request.form.get("username") or "").strip()
+            if target == session.get("user"):
+                message = "不能删除当前登录账户"
+            else:
+                ok, msg = user_store.delete_user(target)
+                message = msg
+        elif op == "reset_pwd":
+            target = (request.form.get("username") or "").strip()
+            new_pwd = (request.form.get("password") or "").strip()
+            ok, msg = user_store.update_password(target, new_pwd)
+            message = msg
     users = user_store.list_users()
     return render_template("admin_users.html", users=users, message=message)
 
@@ -137,7 +151,7 @@ def index():
             flash("交易记录已保存。")
             return redirect(url_for("list_trades"))
 
-    return render_template("index.html", errors=errors, form_data=form_data)
+    return render_template("index.html", errors=errors, form_data=form_data, is_equity=True, equity_active="trades")
 
 
 @app.route("/trades")
@@ -146,7 +160,7 @@ def list_trades():
     if need:
         return need
     trades = trade_store.load_trades(owner=session.get("user"))
-    return render_template("trades.html", trades=trades)
+    return render_template("trades.html", trades=trades, is_equity=True, equity_active="trades")
 
 
 @app.route("/clear", methods=["POST"])
@@ -210,7 +224,7 @@ def edit_trade(index: int):
             else:
                 errors["_general"] = "更新失败，请重试。"
     
-    return render_template("edit.html", errors=errors, form_data=form_data, index=index)
+    return render_template("edit.html", errors=errors, form_data=form_data, index=index, is_equity=True, equity_active="trades")
 
 
 @app.route("/delete/<int:index>", methods=["POST"])
@@ -331,7 +345,7 @@ def import_trades():
     if need:
         return need
     if request.method == "GET":
-        return render_template("import.html")
+        return render_template("import.html", is_equity=True, equity_active="trades")
     
     # 检查文件
     if "file" not in request.files:
@@ -386,15 +400,54 @@ def import_trades():
         
         # 如果有错误，显示错误详情
         if errors:
-            return render_template("import.html", errors=errors, summary=summary)
+            return render_template("import.html", errors=errors, summary=summary, is_equity=True, equity_active="trades")
         
-        return redirect(url_for("list_trades"))
+        
         
     finally:
         # 删除临时文件
         if os.path.exists(file_path):
             os.remove(file_path)
 
+
+@app.route("/equity/transfers")
+def equity_transfers():
+    need = require_login()
+    if need:
+        return need
+    return render_template("equity/transfers.html", is_equity=True, equity_active="transfers")
+
+
+@app.route("/equity/snapshot")
+def equity_snapshot():
+    need = require_login()
+    if need:
+        return need
+    return render_template("equity/snapshot.html", is_equity=True, equity_active="snapshot")
+
+
+@app.route("/equity/analysis/cost")
+def equity_cost_analysis():
+    need = require_login()
+    if need:
+        return need
+    return render_template("equity/cost_analysis.html", is_equity=True, equity_active="cost")
+
+
+@app.route("/equity/analysis/simulator")
+def equity_simulator():
+    need = require_login()
+    if need:
+        return need
+    return render_template("equity/simulator.html", is_equity=True, equity_active="simulator")
+
+
+@app.route("/crypto")
+def crypto_home():
+    need = require_login()
+    if need:
+        return need
+    return render_template("crypto_home.html")
 
 if __name__ == "__main__":
     app.run(debug=True)

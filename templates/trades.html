@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
-  <div class="row justify-content-center">
+  <div class="row">
     <div class="col-12">
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -20,28 +20,19 @@
         </div>
         <div class="card-body">
           {% if trades %}
-            <div class="mb-3">
-              <div class="row g-2">
-                <div class="col-lg-5 col-md-6">
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="search-input"
-                    placeholder="搜索证券代码或证券名称..."
-                    autocomplete="off"
-                  />
-                </div>
-                <div class="col-lg-7 col-md-6 d-flex align-items-center gap-2">
-                  <div class="btn-group" role="group" aria-label="Sort by date">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="sort-asc">时间顺序</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm active" id="sort-desc">时间倒序</button>
-                  </div>
-                  <button type="button" class="btn btn-outline-secondary" id="clear-search" style="display: none;">
-                    清除搜索
-                  </button>
-                  <span id="search-result-count" class="text-muted ms-2"></span>
-                </div>
-              </div>
+            <div class="mb-3 d-flex align-items-center gap-2">
+              <input
+                type="text"
+                class="form-control"
+                id="search-input"
+                placeholder="搜索证券代码或证券名称..."
+                autocomplete="off"
+                style="max-width: 420px;"
+              />
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="clear-search" style="display: none;">
+                清除搜索
+              </button>
+              <span id="search-result-count" class="text-muted ms-2"></span>
             </div>
             <div class="table-responsive">
               <table class="table table-striped table-hover align-middle" id="trades-table">
