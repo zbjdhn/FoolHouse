@@ -49,6 +49,7 @@
                     <th class="text-end">成交价格</th>
                     <th class="text-end">成交数量</th>
                     <th class="text-end">发生金额</th>
+                    <th class="text-end">手续费</th>
                     <th class="text-center">操作</th>
                   </tr>
                 </thead>
@@ -89,6 +90,17 @@
                               aria-label="自动计算提示"
                             >!</span>
                           {% endif %}
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        {% if trade.side == "红股入账" %}
+                          -
+                        {% else %}
+                          {% set amt = (trade.amount | float) %}
+                          {% set qty = (trade.quantity | int) %}
+                          {% set pr = (trade.price | float) %}
+                          {% set fee = ( (amt | abs) - (pr * qty) ) | abs %}
+                          {{ '%.2f' | format(fee) }}
                         {% endif %}
                       </td>
                       <td class="text-center">

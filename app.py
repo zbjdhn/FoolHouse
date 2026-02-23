@@ -6,11 +6,13 @@ from werkzeug.utils import secure_filename
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, session
 from io import BytesIO
 
-from stock_api import get_stock_info
+from stock_api import get_stock_info, get_batch_stock_info
 from validators.trade_rules import validate_and_build_trade as validate_trade
 from importers.excel_parser import parse_excel_file as parse_excel
 import services.trade_store as trade_store
 import services.user_store as user_store
+import services.analysis as analysis
+import services.snapshot_store as snapshot_store
 
 try:
     import pandas as pd
@@ -254,6 +256,26 @@ def api_get_stock(code: str):
     return jsonify(result)
 
 
+@app.get("/api/stocks")
+def api_get_stocks():
+    """批量获取股票当前价格与名称，codes=600000,000001"""
+    codes_param = (request.args.get("codes") or "").strip()
+    if not codes_param:
+        return jsonify({})
+    codes = [c.strip() for c in codes_param.split(",") if c.strip()]
+    data = get_batch_stock_info(codes)
+    return jsonify(data)
+
+
+@app.get("/api/snapshot/total-assets")
+def api_get_total_assets_snapshot():
+    """返回最新的总资产快照，若不存在则返回空对象"""
+    v = snapshot_store.get_latest_total_assets()
+    if v is None:
+        return jsonify({})
+    return jsonify({"total_assets": v})
+
+
 @app.route("/export")
 def export_trades():
     """导出所有交易记录为Excel文件"""
@@ -431,7 +453,9 @@ def equity_cost_analysis():
     need = require_login()
     if need:
         return need
-    return render_template("equity/cost_analysis.html", is_equity=True, equity_active="cost")
+    trades = trade_store.load_trades(owner=session.get("user"))
+    positions = analysis.compute_positions(trades)
+    return render_template("equity/cost_analysis.html", is_equity=True, equity_active="cost", positions=positions)
 
 
 @app.route("/equity/analysis/simulator")

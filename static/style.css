@@ -94,6 +94,11 @@ main.container {
   line-height: 1;
 }
 
+/* 表格分栏线（成本与当前市值区域分隔） */
+.table .col-sep {
+  border-left: 2px solid #dee2e6;
+}
+
 #stock-info {
   border-left: 3px solid #0d6efd;
   transition: all 0.3s ease;

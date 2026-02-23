@@ -6,6 +6,7 @@ import re
 from typing import Optional, Dict
 import urllib.request
 import urllib.error
+from typing import List
 
 
 def normalize_stock_code(code: str) -> Optional[str]:
@@ -25,11 +26,13 @@ def normalize_stock_code(code: str) -> Optional[str]:
         return code.lower()
     
     # 判断是上海还是深圳
-    # 上海：600xxx, 601xxx, 603xxx, 605xxx, 688xxx
-    # 深圳：000xxx, 001xxx, 002xxx, 003xxx, 300xxx
-    if re.match(r"^(600|601|603|605|688)\d{3}$", code):
+    # 上海主板/科创板：600xxx, 601xxx, 603xxx, 605xxx, 688xxx
+    # 上海ETF常见：510xxx, 511xxx, 512xxx, 513xxx, 515xxx, 516xxx, 518xxx, 588xxx
+    # 深圳主板/创业板：000xxx, 001xxx, 002xxx, 003xxx, 300xxx
+    # 深圳ETF常见：159xxx
+    if re.match(r"^(600|601|603|605|688|510|511|512|513|515|516|518|588)\d{3}$", code):
         return f"sh{code}"
-    elif re.match(r"^(000|001|002|003|300)\d{3}$", code):
+    elif re.match(r"^(000|001|002|003|300|159)\d{3}$", code):
         return f"sz{code}"
     
     return None
@@ -161,3 +164,70 @@ def get_stock_info(user_input_code: str) -> Dict[str, Optional[str]]:
         }
     
     return fetch_stock_info(normalized_code)
+
+
+def fetch_batch_stock_info(codes: List[str]) -> Dict[str, Dict[str, Optional[str]]]:
+    """
+    批量获取股票信息（按规范化代码，如 sh600000）
+    返回以规范化代码为键的字典
+    """
+    if not codes:
+        return {}
+    # 去重并保持顺序
+    seen = set()
+    norm_codes = []
+    for c in codes:
+        if c and c not in seen:
+            seen.add(c)
+            norm_codes.append(c)
+    url = "https://qt.gtimg.cn/q=" + ",".join(norm_codes)
+    req = urllib.request.Request(url)
+    req.add_header("User-Agent", "Mozilla/5.0")
+    req.add_header("Referer", "https://finance.qq.com/")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = resp.read().decode("gbk", errors="ignore")
+    except Exception:
+        return {}
+    result: Dict[str, Dict[str, Optional[str]]] = {}
+    # 每行一个 v_shXXXX="..."; 也可能多行合并，按分号拆
+    for segment in data.split(";"):
+        segment = segment.strip()
+        if not segment:
+            continue
+        m = re.search(r'v_([a-z]{2}\d{6})="([^"]*)"', segment)
+        if not m:
+            continue
+        norm = m.group(1)
+        parts = m.group(2).split("~")
+        name = parts[1] if len(parts) > 1 and parts[1] else None
+        price = parts[3] if len(parts) > 3 and parts[3] else None
+        # 校验数值
+        if price:
+            try:
+                float(price)
+            except ValueError:
+                price = None
+        result[norm] = {"name": name, "current_price": price}
+    return result
+
+
+def get_batch_stock_info(user_codes: List[str]) -> Dict[str, Dict[str, Optional[str]]]:
+    """
+    批量接口（按用户输入的6位代码列表） -> 返回以6位代码为键
+    """
+    mapping = {}
+    norm_list = []
+    for c in user_codes:
+        nc = normalize_stock_code(c)
+        if nc:
+            mapping[nc] = c  # 规范化 -> 原始6位
+            norm_list.append(nc)
+    data = fetch_batch_stock_info(norm_list)
+    out: Dict[str, Dict[str, Optional[str]]] = {}
+    for nc, info in data.items():
+        six = mapping.get(nc)
+        if not six:
+            continue
+        out[six] = {"name": info.get("name"), "current_price": info.get("current_price")}
+    return out

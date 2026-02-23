@@ -2,8 +2,200 @@
 {% block content %}
 <div class="card">
   <div class="card-body">
-    <h5 class="card-title mb-2">持仓成本</h5>
-    <p class="text-muted mb-0">页面待开发</p>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="card-title mb-0">持仓成本</h5>
+      <small class="text-muted">基于移动加权平均成本法</small>
+    </div>
+    {% if positions and positions|length > 0 %}
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <label class="form-label mb-0">当前资产总值：</label>
+      <input type="number" step="0.01" class="form-control form-control-sm" id="total-assets" placeholder="请输入总资产，需大于持仓市值合计" style="max-width: 260px;">
+      <small class="text-muted" id="assets-hint"></small>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle" id="positions-table">
+        <thead>
+          <tr>
+            <th>证券代码</th>
+            <th>证券名称</th>
+            <th class="text-end">持有股数</th>
+            <th class="text-end col-sep">成本价</th>
+            <th class="text-end">绝对成本价</th>
+            <th class="text-end col-sep">当前价格</th>
+            <th class="text-end">
+              持仓价值
+              <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" id="sort-pos-desc" title="按持仓价值倒序">↓</button>
+              <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" id="sort-pos-asc" title="按持仓价值顺序">↑</button>
+            </th>
+            <th class="text-end">持仓占比</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in positions %}
+          <tr data-code="{{ p.code }}" data-shares="{{ p.shares }}">
+            <td>{{ p.code }}</td>
+            <td>{{ p.name or '-' }}</td>
+            <td class="text-end fmt-int">{{ p.shares }}</td>
+            <td class="text-end col-sep"><span class="fmt-money-2">{{ '%.2f'|format(p.cost_price) }}</span></td>
+            <td class="text-end"><span class="fmt-money-2">{{ '%.2f'|format(p.absolute_cost_price) }}</span></td>
+            <td class="text-end col-sep"><span class="js-current-price" data-code="{{ p.code }}">-</span></td>
+            <td class="text-end"><span class="js-position-value" data-code="{{ p.code }}" data-value="0">-</span></td>
+            <td class="text-end"><span class="js-weight" data-code="{{ p.code }}">-</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        function fmt2(n) {
+          if (n === null || n === undefined || isNaN(n)) return "-";
+          return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function fmtInt(n) {
+          if (n === null || n === undefined || isNaN(n)) return "-";
+          return Math.round(Number(n)).toLocaleString('zh-CN');
+        }
+        function fmtMoney(n, decimals) {
+          if (n === null || n === undefined || isNaN(n)) return "-";
+          var s = Number(n).toLocaleString('zh-CN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+          return '¥' + s;
+        }
+        // 对服务器渲染的数值统一格式化
+        document.querySelectorAll('.fmt-money-2').forEach(function(el){
+          var v = parseFloat((el.textContent || '').replace(/,/g, ''));
+          el.textContent = fmtMoney(v, 2);
+        });
+        document.querySelectorAll('.fmt-int').forEach(function(el){
+          var v = parseFloat(el.textContent.replace(/,/g, ''));
+          el.textContent = fmtInt(v);
+        });
+
+        var rows = Array.from(document.querySelectorAll("tr[data-code]"));
+        if (!rows.length) return;
+        var codes = rows.map(function(r){ return r.getAttribute("data-code"); });
+        // 去重
+        var uniq = Array.from(new Set(codes));
+        if (!uniq.length) return;
+        // 辅助：ETF判断（影响价格精度）
+        function isETF(code) {
+          return /^(510|511|512|513|515|516|518|588|159)\d{3}$/.test(code || "");
+        }
+        // 批量请求
+        fetch("/api/stocks?codes=" + encodeURIComponent(uniq.join(",")))
+          .then(function(resp){ return resp.json(); })
+          .then(function(map){
+            var totalValue = 0;
+            rows.forEach(function(r){
+              var code = r.getAttribute("data-code");
+              var shares = parseFloat(r.getAttribute("data-shares") || "0") || 0;
+              var priceEl = r.querySelector('.js-current-price');
+              var valueEl = r.querySelector('.js-position-value');
+              var item = map && map[code] ? map[code] : null;
+              if (item && item.current_price) {
+                var p = parseFloat(item.current_price);
+                if (!isNaN(p)) {
+                  var decimals = isETF(code) ? 3 : 2;
+                  priceEl.textContent = fmtMoney(p, decimals);
+                  var value = p * shares;
+                  totalValue += value;
+                  valueEl.textContent = fmtMoney(value, 2);
+                  valueEl.setAttribute('data-value', String(value));
+                } else {
+                  priceEl.textContent = "-";
+                  valueEl.textContent = "-";
+                  valueEl.setAttribute('data-value', "0");
+                }
+              } else {
+                priceEl.textContent = "-";
+                valueEl.textContent = "-";
+                valueEl.setAttribute('data-value', "0");
+              }
+            });
+            // 监听用户输入总资产，计算占比
+            var input = document.getElementById('total-assets');
+            var hint = document.getElementById('assets-hint');
+            // 默认值：先尝试localStorage手动值，再尝试最新快照
+            var lsVal = localStorage.getItem('fh_total_assets');
+            if (lsVal && !input.value) {
+              input.value = lsVal;
+            }
+            if (!input.value) {
+              fetch('/api/snapshot/total-assets')
+                .then(function(r){ return r.json(); })
+                .then(function(d){
+                  if (d && typeof d.total_assets !== 'undefined' && d.total_assets !== null && input.value === '') {
+                    var tv = parseFloat(d.total_assets);
+                    if (!isNaN(tv)) {
+                      input.value = tv;
+                    }
+                  }
+                  recalc();
+                })
+                .catch(function(){ recalc(); });
+            }
+            function recalc() {
+              var tv = totalValue;
+              var userTotal = parseFloat((input.value || '').trim());
+              if (!input.value) {
+                hint.textContent = "持仓合计：" + fmtMoney(tv, 2);
+                document.querySelectorAll('.js-weight').forEach(function(el){ el.textContent = "-"; });
+                return;
+              }
+              if (isNaN(userTotal) || userTotal <= tv) {
+                hint.textContent = "请输入大于持仓合计的总资产（当前：" + fmtMoney(tv, 2) + "）";
+                document.querySelectorAll('.js-weight').forEach(function(el){ el.textContent = "-"; });
+                return;
+              }
+              var cash = userTotal - tv;
+              var posPct = Math.round((tv / userTotal) * 100);
+              var cashPct = Math.round((cash / userTotal) * 100);
+              hint.textContent = "持仓合计：" + fmtMoney(tv, 2) + "（" + posPct + "%）" + "，可用现金估计：" + fmtMoney(cash, 2) + "（" + cashPct + "%）";
+              rows.forEach(function(r){
+                var valEl = r.querySelector('.js-position-value');
+                var wEl = r.querySelector('.js-weight');
+                var v = parseFloat((valEl.textContent || '').replace(/[¥,]/g, ''));
+                if (isNaN(v)) {
+                  wEl.textContent = "-";
+                } else {
+                  var rate = v / userTotal * 100;
+                  wEl.textContent = fmt2(rate) + "%";
+                }
+              });
+              localStorage.setItem('fh_total_assets', input.value);
+            }
+            input.addEventListener('input', recalc);
+            recalc();
+
+            // 排序功能：持仓价值
+            var tbody = document.querySelector('#positions-table tbody');
+            function sortByValue(desc) {
+              var rs = Array.from(rows);
+              rs.sort(function(a, b){
+                var va = parseFloat(a.querySelector('.js-position-value').getAttribute('data-value') || "0") || 0;
+                var vb = parseFloat(b.querySelector('.js-position-value').getAttribute('data-value') || "0") || 0;
+                return desc ? (vb - va) : (va - vb);
+              });
+              rs.forEach(function(r){ tbody.appendChild(r); });
+            }
+            var btnDesc = document.getElementById('sort-pos-desc');
+            var btnAsc = document.getElementById('sort-pos-asc');
+            if (btnDesc) btnDesc.addEventListener('click', function(){ sortByValue(true); });
+            if (btnAsc) btnAsc.addEventListener('click', function(){ sortByValue(false); });
+          })
+          .catch(function(){
+            rows.forEach(function(r){
+              var priceEl = r.querySelector('.js-current-price');
+              var valueEl = r.querySelector('.js-position-value');
+              priceEl.textContent = "-";
+              valueEl.textContent = "-";
+            });
+          });
+      });
+    </script>
+    {% else %}
+    <p class="text-muted mb-0">暂无可计算的持仓。</p>
+    {% endif %}
   </div>
-</div>
+  </div>
 {% endblock %}
