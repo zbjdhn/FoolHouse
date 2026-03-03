@@ -8,11 +8,15 @@ from io import BytesIO
 
 from stock_api import get_stock_info, get_batch_stock_info
 from validators.trade_rules import validate_and_build_trade as validate_trade
+from validators.crypto_rules import validate_and_build_trade as validate_crypto_trade
 from importers.excel_parser import parse_excel_file as parse_excel
+from importers.crypto_excel_parser import parse_excel_file as parse_crypto_excel
 import services.trade_store as trade_store
+import services.crypto_store as crypto_store
 import services.user_store as user_store
 import services.analysis as analysis
 import services.snapshot_store as snapshot_store
+import services.crypto_tokens_store as crypto_tokens
 
 try:
     import pandas as pd
@@ -22,25 +26,8 @@ except ImportError:
 
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
-def _choose_dir(env_key: str, default_subdir: str) -> str:
-    env_path = os.environ.get(env_key)
-    if env_path:
-        try:
-            os.makedirs(env_path, exist_ok=True)
-            return env_path
-        except OSError:
-            pass
-    default_path = os.path.join(BASE_DIR, default_subdir)
-    try:
-        os.makedirs(default_path, exist_ok=True)
-        return default_path
-    except OSError:
-        tmp_path = os.path.join("/tmp", "foolhouse", default_subdir)
-        os.makedirs(tmp_path, exist_ok=True)
-        return tmp_path
-
-UPLOAD_DIR = _choose_dir("FOOLHOUSE_UPLOAD_DIR", "uploads")
+from services.paths import get_data_dir
+UPLOAD_DIR = os.environ.get("FOOLHOUSE_UPLOAD_DIR") or get_data_dir("uploads")
 
 
 app = Flask(__name__)
@@ -468,10 +455,312 @@ def equity_simulator():
 
 @app.route("/crypto")
 def crypto_home():
+    return redirect(url_for("crypto_list_trades"))
+
+
+@app.route("/crypto/add", methods=["GET", "POST"])
+def crypto_add():
     need = require_login()
     if need:
         return need
-    return render_template("crypto_home.html")
+    crypto_store.ensure_data_file()
+    errors: dict[str, str] = {}
+    allowed = crypto_tokens.list_tokens()
+    allowed_platforms = ["Binance", "OKX", "Bitget", "Other CEX", "DEX"]
+    form_data = {
+        "date": date.today().isoformat(),
+        "code": "",
+        "platform": "",
+        "side": "买入",
+        "price": "",
+        "quantity": "",
+    }
+    if request.method == "POST":
+        form_data.update(
+            {
+                "date": (request.form.get("date") or "").strip(),
+                "code": (request.form.get("code") or "").strip(),
+                "platform": (request.form.get("platform") or "").strip(),
+                "side": (request.form.get("side") or "").strip(),
+                "price": (request.form.get("price") or "").strip(),
+                "quantity": (request.form.get("quantity") or "").strip(),
+            }
+        )
+        trade, errors = validate_crypto_trade(request.form)
+        if not errors:
+            # 限制代币代码
+            code_u = (trade.get("code") or "").upper()
+            is_admin = session.get("is_admin")
+            if not is_admin and code_u not in allowed:
+                flash("该代币未在白名单中，请申请新增代币。")
+                return redirect(url_for("crypto_add"))
+            trade["code"] = code_u
+            trade["owner"] = session.get("user")
+            crypto_store.append_trade(trade)
+            flash("Crypto 交易记录已保存。")
+            return redirect(url_for("crypto_list_trades"))
+    return render_template("crypto/index.html", errors=errors, form_data=form_data, tokens=allowed, platforms=allowed_platforms, is_crypto=True, crypto_active="trades")
+
+
+@app.route("/crypto/trades")
+def crypto_list_trades():
+    need = require_login()
+    if need:
+        return need
+    trades = crypto_store.load_trades(owner=session.get("user"))
+    return render_template("crypto/trades.html", trades=trades, is_crypto=True, crypto_active="trades")
+
+
+@app.route("/crypto/edit/<int:index>", methods=["GET", "POST"])
+def crypto_edit_trade(index: int):
+    need = require_login()
+    if need:
+        return need
+    crypto_store.ensure_data_file()
+    orig_index, trade = crypto_store.get_trade_by_display_index(index, owner=session.get("user"))
+    if orig_index is None:
+        flash("交易记录不存在。")
+        return redirect(url_for("crypto_list_trades"))
+    errors: dict[str, str] = {}
+    allowed = crypto_tokens.list_tokens()
+    allowed_platforms = ["Binance", "OKX", "Bitget", "Other CEX", "DEX"]
+    form_data = {
+        "date": trade.get("date", ""),
+        "code": trade.get("code", ""),
+        "platform": trade.get("platform", ""),
+        "side": trade.get("side", "买入"),
+        "price": trade.get("price", ""),
+        "quantity": trade.get("quantity", ""),
+    }
+    d = form_data.get("date") or ""
+    if len(d) == 8 and d.isdigit():
+        form_data["date"] = f"{d[0:4]}-{d[4:6]}-{d[6:8]}"
+    if request.method == "POST":
+        form_data.update(
+            {
+                "date": (request.form.get("date") or "").strip(),
+                "code": (request.form.get("code") or "").strip(),
+                "platform": (request.form.get("platform") or "").strip(),
+                "side": (request.form.get("side") or "").strip(),
+                "price": (request.form.get("price") or "").strip(),
+                "quantity": (request.form.get("quantity") or "").strip(),
+            }
+        )
+        updated_trade, errors = validate_crypto_trade(request.form)
+        if not errors:
+            code_u = (updated_trade.get("code") or "").upper()
+            is_admin = session.get("is_admin")
+            if not is_admin and code_u not in allowed:
+                errors["_general"] = "该代币未在白名单中，请申请新增代币。"
+            else:
+                if "platform" not in request.form or not (updated_trade.get("platform") or "").strip():
+                    updated_trade["platform"] = trade.get("platform", "")
+                updated_trade["code"] = code_u
+                updated_trade["owner"] = session.get("user")
+                if crypto_store.update_trade_by_index(orig_index, updated_trade):
+                    flash("交易记录已更新。")
+                    return redirect(url_for("crypto_list_trades"))
+                else:
+                    errors["_general"] = "更新失败，请重试。"
+    return render_template("crypto/edit.html", errors=errors, form_data=form_data, index=index, tokens=allowed, platforms=allowed_platforms, is_crypto=True, crypto_active="trades")
+
+
+@app.route("/crypto/delete/<int:index>", methods=["POST"])
+def crypto_delete_trade(index: int):
+    need = require_login()
+    if need:
+        return need
+    ok = crypto_store.delete_trade_by_index(index)
+    if ok:
+        flash("已删除交易记录。")
+    else:
+        flash("删除失败。")
+    return redirect(url_for("crypto_list_trades"))
+
+
+@app.route("/crypto/clear", methods=["POST"])
+def crypto_clear_trades():
+    need = require_login()
+    if need:
+        return need
+    trades = crypto_store.load_trades(owner=session.get("user"))
+    remaining = [t for t in trades if (t.get("owner") or "") != session.get("user")]
+    if remaining:
+        with open(crypto_store.DATA_FILE, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=crypto_store.CSV_HEADERS)
+            writer.writeheader()
+            for r in remaining:
+                writer.writerow(r)
+    else:
+        with open(crypto_store.DATA_FILE, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(crypto_store.CSV_HEADERS)
+    flash("已清除所有 Crypto 历史交易数据。")
+    return redirect(url_for("crypto_list_trades"))
+
+
+@app.route("/crypto/export")
+def crypto_export_trades():
+    need = require_login()
+    if need:
+        return need
+    if not PANDAS_AVAILABLE:
+        flash("导出功能需要pandas库，请运行: pip install pandas openpyxl")
+        return redirect(url_for("crypto_list_trades"))
+    try:
+        trades = crypto_store.load_trades(owner=session.get("user"))
+        if not trades:
+            flash("没有交易记录可导出。")
+            return redirect(url_for("crypto_list_trades"))
+        df = pd.DataFrame(trades)
+        # 统一代码大写
+        if "code" in df.columns:
+            df["code"] = df["code"].map(lambda x: (str(x or "")).upper())
+        if "date" in df.columns:
+            def _fmt(v):
+                s = str(v or "").strip()
+                if len(s) == 10 and s[4] == "-" and s[7] == "-":
+                    return s.replace("-", "")
+                elif len(s) == 8 and s.isdigit():
+                    return s
+                else:
+                    return s
+            df["date"] = df["date"].map(_fmt)
+        column_mapping = {
+            "date": "成交日期",
+            "code": "代币代码",
+            "platform": "平台",
+            "side": "买卖标志",
+            "price": "成交价格",
+            "quantity": "成交数量",
+        }
+        df = df.rename(columns=column_mapping)
+        df = df[["成交日期", "代币代码", "平台", "买卖标志", "成交价格", "成交数量"]]
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='交易记录')
+            ws = writer.sheets['交易记录']
+            for idx, col in enumerate(df.columns):
+                max_length = max(df[col].astype(str).map(len).max(), len(col)) + 2
+                ws.column_dimensions[chr(65 + idx)].width = min(max_length, 20)
+        output.seek(0)
+        from datetime import datetime
+        filename = f"Crypto交易记录_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        flash(f"导出失败：{str(e)}")
+        return redirect(url_for("crypto_list_trades"))
+
+
+@app.route("/crypto/import", methods=["GET", "POST"])
+def crypto_import_trades():
+    need = require_login()
+    if need:
+        return need
+    if request.method == "GET":
+        return render_template("crypto/import.html", is_crypto=True, crypto_active="trades")
+    if "file" not in request.files:
+        flash("请选择要上传的Excel文件。")
+        return redirect(url_for("crypto_import_trades"))
+    file = request.files["file"]
+    if file.filename == "":
+        flash("请选择要上传的Excel文件。")
+        return redirect(url_for("crypto_import_trades"))
+    if not file.filename.lower().endswith((".xlsx", ".xls")):
+        flash("只支持Excel文件格式（.xlsx 或 .xls）。")
+        return redirect(url_for("crypto_import_trades"))
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    file.save(file_path)
+    try:
+        trades, errors, summary = parse_crypto_excel(file_path)
+        if "error" in summary:
+            flash(f"导入失败：{summary['error']}")
+            return redirect(url_for("crypto_import_trades"))
+        success_count = 0
+        allowed = crypto_tokens.list_tokens()
+        is_admin = session.get("is_admin")
+        for trade in trades:
+            trade_dict, validation_errors = validate_crypto_trade(trade)
+            if not validation_errors:
+                code_u = (trade_dict.get("code") or "").upper()
+                if not is_admin and code_u not in allowed:
+                    errors.append(f"代币 {code_u} 不在白名单中，已跳过（请申请新增）")
+                    continue
+                trade_dict["code"] = code_u
+                trade_dict["owner"] = session.get("user")
+                crypto_store.append_trade(trade_dict)
+                success_count += 1
+        messages = []
+        if success_count > 0:
+            messages.append(f"成功导入 {success_count} 条交易记录。")
+        if errors:
+            messages.append(f"有 {len(errors)} 条记录存在错误，未导入。")
+        if len(errors) > 0:
+            messages.append("详细错误信息请查看导入结果。")
+        flash(" ".join(messages))
+        if errors:
+            return render_template("crypto/import.html", errors=errors, summary=summary, is_crypto=True, crypto_active="trades")
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    return redirect(url_for("crypto_list_trades"))
+
+
+@app.route("/crypto/transfers")
+def crypto_transfers():
+    need = require_login()
+    if need:
+        return need
+    return render_template("crypto/transfers.html", is_crypto=True, crypto_active="transfers")
+
+
+@app.post("/crypto/token-request")
+def crypto_token_request():
+    need = require_login()
+    if need:
+        return need
+    code = (request.form.get("code") or "").strip().upper()
+    name = (request.form.get("name") or "").strip()
+    reason = (request.form.get("reason") or "").strip()
+    if not code:
+        flash("请输入代币代码")
+        return redirect(url_for("crypto_add"))
+    if crypto_tokens.submit_request(session.get("user"), code, name, reason):
+        flash("已提交申请，管理员审核后可用")
+    else:
+        flash("申请已存在或代币已在白名单中")
+    return redirect(url_for("crypto_add"))
+
+
+@app.route("/admin/crypto/tokens", methods=["GET", "POST"])
+def admin_crypto_tokens():
+    if not session.get("user"):
+        return redirect(url_for("login", next=request.path))
+    if not session.get("is_admin"):
+        flash("无权限")
+        return redirect(url_for("list_trades"))
+    message = ""
+    if request.method == "POST":
+        op = (request.form.get("op") or "").strip()
+        code = (request.form.get("code") or "").strip().upper()
+        if op == "add":
+            ok = crypto_tokens.add_token(code)
+            message = "添加成功" if ok else "已存在或无效"
+        elif op == "remove":
+            ok = crypto_tokens.remove_token(code)
+            message = "已移除" if ok else "不存在"
+        elif op == "approve":
+            ok = crypto_tokens.approve_request(code)
+            message = "已批准并加入白名单" if ok else "批准失败"
+    tokens = crypto_tokens.list_tokens()
+    requests = crypto_tokens.list_requests()
+    return render_template("admin_crypto_tokens.html", tokens=tokens, requests=requests, message=message)
 
 if __name__ == "__main__":
     app.run(debug=True)

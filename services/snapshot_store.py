@@ -1,29 +1,14 @@
 import json
 import os
+import shutil
+from datetime import datetime
 from typing import Optional
+from services.paths import get_data_dir
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
-def _choose_data_dir() -> str:
-    env_path = os.environ.get("FOOLHOUSE_DATA_DIR")
-    if env_path:
-        try:
-            os.makedirs(env_path, exist_ok=True)
-            return env_path
-        except OSError:
-            pass
-    default_path = os.path.join(ROOT_DIR, "data")
-    try:
-        os.makedirs(default_path, exist_ok=True)
-        return default_path
-    except OSError:
-        tmp_path = os.path.join("/tmp", "foolhouse", "data")
-        os.makedirs(tmp_path, exist_ok=True)
-        return tmp_path
-
-
-DATA_DIR = _choose_data_dir()
+DATA_DIR = get_data_dir("data")
 SNAPSHOT_FILE = os.path.join(DATA_DIR, "snapshot.json")
 
 
@@ -43,3 +28,14 @@ def get_latest_total_assets() -> Optional[float]:
     except Exception:
         return None
 
+
+def backup_snapshot() -> None:
+    try:
+        if os.path.exists(SNAPSHOT_FILE):
+            backups_dir = get_data_dir("backups")
+            stamp = datetime.now().strftime("%Y%m%d")
+            backup_file = os.path.join(backups_dir, f"snapshot_{stamp}.json")
+            if not os.path.exists(backup_file):
+                shutil.copy2(SNAPSHOT_FILE, backup_file)
+    except Exception:
+        pass

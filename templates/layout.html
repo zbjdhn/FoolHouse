@@ -36,7 +36,7 @@
               <a class="nav-link top-switch-link{% if request.endpoint in ['list_trades','index','edit_trade','import_trades','equity_transfers','equity_snapshot','equity_cost_analysis','equity_simulator'] %} active{% endif %}" href="{{ url_for('list_trades') }}">A股</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link top-switch-link{% if request.endpoint == 'crypto_home' %} active{% endif %}" href="{{ url_for('crypto_home') }}">Crypto</a>
+              <a class="nav-link top-switch-link{% if request.endpoint in ['crypto_list_trades','crypto_add','crypto_edit_trade','crypto_import_trades','crypto_transfers'] %} active{% endif %}" href="{{ url_for('crypto_home') }}">Crypto</a>
             </li>
           </ul>
           <ul class="navbar-nav ms-auto">
@@ -44,6 +44,9 @@
               {% if session.get('is_admin') %}
               <li class="nav-item">
                 <a class="nav-link admin-link me-2{% if request.endpoint == 'admin_users' %} active{% endif %}" href="{{ url_for('admin_users') }}">用户管理</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link admin-link me-2{% if request.endpoint == 'admin_crypto_tokens' %} active{% endif %}" href="{{ url_for('admin_crypto_tokens') }}">Crypto 白名单</a>
               </li>
               {% endif %}
               <li class="nav-item">
@@ -62,22 +65,30 @@
       </div>
     </nav>
 
-    <main class="{% if is_equity %}container-fluid px-0{% else %}container{% endif %} mb-4">
+    <main class="{% if is_equity or is_crypto %}container-fluid px-0{% else %}container{% endif %} mb-4">
       <div class="row g-0">
-        <aside class="sidebar col-md-3 col-lg-2 mb-3 border-end bg-light" {% if not is_equity %}style="display: none;"{% endif %}>
-          <div class="list-group list-group-flush mb-3 rounded-0">
-            <div class="list-group-item sidebar-section-title">数据库</div>
-            <a href="{{ url_for('list_trades') }}" class="list-group-item list-group-item-action sidebar-subitem{% if equity_active == 'trades' %} active{% endif %}">交易记录</a>
-            <a href="{{ url_for('equity_transfers') }}" class="list-group-item list-group-item-action sidebar-subitem{% if equity_active == 'transfers' %} active{% endif %}">充提记录</a>
-            <a href="{{ url_for('equity_snapshot') }}" class="list-group-item list-group-item-action sidebar-subitem{% if equity_active == 'snapshot' %} active{% endif %}">持仓快照</a>
-          </div>
-          <div class="list-group list-group-flush rounded-0">
-            <div class="list-group-item sidebar-section-title">数据分析</div>
-            <a href="{{ url_for('equity_cost_analysis') }}" class="list-group-item list-group-item-action sidebar-subitem{% if equity_active == 'cost' %} active{% endif %}">持仓成本</a>
-            <a href="{{ url_for('equity_simulator') }}" class="list-group-item list-group-item-action sidebar-subitem{% if equity_active == 'simulator' %} active{% endif %}">持仓模拟器</a>
-          </div>
+        <aside class="sidebar col-md-3 col-lg-2 mb-3 border-end bg-light" {% if not (is_equity or is_crypto) %}style="display: none;"{% endif %}>
+          {% if is_equity %}
+            <div class="list-group list-group-flush mb-3 rounded-0">
+              <div class="list-group-item sidebar-section-title">数据库</div>
+              <a href="{{ url_for('list_trades') }}" class="list-group-item list-group-item-action sidebar-subitem{% if equity_active == 'trades' %} active{% endif %}">交易记录</a>
+              <a href="{{ url_for('equity_transfers') }}" class="list-group-item list-group-item-action sidebar-subitem{% if equity_active == 'transfers' %} active{% endif %}">充提记录</a>
+              <a href="{{ url_for('equity_snapshot') }}" class="list-group-item list-group-item-action sidebar-subitem{% if equity_active == 'snapshot' %} active{% endif %}">持仓快照</a>
+            </div>
+            <div class="list-group list-group-flush rounded-0">
+              <div class="list-group-item sidebar-section-title">数据分析</div>
+              <a href="{{ url_for('equity_cost_analysis') }}" class="list-group-item list-group-item-action sidebar-subitem{% if equity_active == 'cost' %} active{% endif %}">持仓成本</a>
+              <a href="{{ url_for('equity_simulator') }}" class="list-group-item list-group-item-action sidebar-subitem{% if equity_active == 'simulator' %} active{% endif %}">持仓模拟器</a>
+            </div>
+          {% elif is_crypto %}
+            <div class="list-group list-group-flush mb-3 rounded-0">
+              <div class="list-group-item sidebar-section-title">数据库</div>
+              <a href="{{ url_for('crypto_list_trades') }}" class="list-group-item list-group-item-action sidebar-subitem{% if crypto_active == 'trades' %} active{% endif %}">交易记录</a>
+              <a href="{{ url_for('crypto_transfers') }}" class="list-group-item list-group-item-action sidebar-subitem{% if crypto_active == 'transfers' %} active{% endif %}">出入金记录</a>
+            </div>
+          {% endif %}
         </aside>
-        <section class="{% if is_equity %}col-md-9 col-lg-10 px-3 px-md-4{% else %}col-12{% endif %}">
+        <section class="{% if is_equity or is_crypto %}col-md-9 col-lg-10 px-3 px-md-4{% else %}col-12{% endif %}">
           {% with messages = get_flashed_messages() %}
             {% if messages %}
               <div class="alert alert-success" role="alert">

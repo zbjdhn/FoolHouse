@@ -1,28 +1,14 @@
 import json
 import os
+import shutil
 import hashlib
+from datetime import datetime
 from typing import List, Dict, Optional
+from services.paths import get_data_dir
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-def _choose_data_dir() -> str:
-    env_path = os.environ.get("FOOLHOUSE_DATA_DIR")
-    if env_path:
-        try:
-            os.makedirs(env_path, exist_ok=True)
-            return env_path
-        except OSError:
-            pass
-    default_path = os.path.join(ROOT_DIR, "data")
-    try:
-        os.makedirs(default_path, exist_ok=True)
-        return default_path
-    except OSError:
-        tmp_path = os.path.join("/tmp", "foolhouse", "data")
-        os.makedirs(tmp_path, exist_ok=True)
-        return tmp_path
-
-DATA_DIR = _choose_data_dir()
+DATA_DIR = get_data_dir("data")
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 
 
@@ -32,6 +18,13 @@ def _hash(password: str) -> str:
 
 def ensure_users_file() -> None:
     os.makedirs(DATA_DIR, exist_ok=True)
+    # 迁移旧文件
+    old_file = os.path.join(ROOT_DIR, "data", "users.json")
+    if not os.path.exists(USERS_FILE) and os.path.exists(old_file):
+        try:
+            shutil.copy2(old_file, USERS_FILE)
+        except Exception:
+            pass
     if not os.path.exists(USERS_FILE):
         users = [
             {"username": "admin", "password_hash": _hash("001123"), "is_admin": True},
@@ -39,6 +32,15 @@ def ensure_users_file() -> None:
         ]
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(users, f, ensure_ascii=False, indent=2)
+    # 每日备份
+    try:
+        backups_dir = get_data_dir("backups")
+        stamp = datetime.now().strftime("%Y%m%d")
+        backup_file = os.path.join(backups_dir, f"users_{stamp}.json")
+        if os.path.exists(USERS_FILE) and not os.path.exists(backup_file):
+            shutil.copy2(USERS_FILE, backup_file)
+    except Exception:
+        pass
 
 
 def _load_users() -> List[Dict]:

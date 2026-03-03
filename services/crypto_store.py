@@ -7,15 +7,16 @@ from services.paths import get_data_dir
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
+
 DATA_DIR = get_data_dir("data")
-DATA_FILE = os.path.join(DATA_DIR, "trades.csv")
-CSV_HEADERS = ["owner", "date", "code", "name", "side", "price", "quantity", "amount", "amount_auto"]
+DATA_FILE = os.path.join(DATA_DIR, "crypto_trades.csv")
+CSV_HEADERS = ["owner", "date", "code", "platform", "side", "price", "quantity"]
 
 
 def ensure_data_file() -> None:
     os.makedirs(DATA_DIR, exist_ok=True)
-    # 迁移旧路径文件到新持久目录
-    old_file = os.path.join(ROOT_DIR, "data", "trades.csv")
+    # 迁移旧路径文件
+    old_file = os.path.join(ROOT_DIR, "data", "crypto_trades.csv")
     if not os.path.exists(DATA_FILE) and os.path.exists(old_file):
         try:
             shutil.copy2(old_file, DATA_FILE)
@@ -26,40 +27,38 @@ def ensure_data_file() -> None:
             writer = csv.writer(f)
             writer.writerow(CSV_HEADERS)
     else:
-        with open(DATA_FILE, "r", newline="", encoding="utf-8") as f:
-            reader = csv.reader(f)
-            rows = list(reader)
-        if not rows:
-            with open(DATA_FILE, "w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                writer.writerow(CSV_HEADERS)
-        else:
-            header = rows[0]
-            if header != CSV_HEADERS:
+        try:
+            with open(DATA_FILE, "r", newline="", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                first_row = next(reader, None)
+            current_headers = first_row if first_row else []
+            # 升级旧文件表头：补充/重排为新表头，去除 name/amount/amount_auto
+            if current_headers and current_headers != CSV_HEADERS:
                 with open(DATA_FILE, "r", newline="", encoding="utf-8") as f:
-                    dict_reader = csv.DictReader(f)
-                    existing = list(dict_reader)
+                    dr = csv.DictReader(f)
+                    rows = list(dr)
                 with open(DATA_FILE, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
-                    writer.writeheader()
-                    for row in existing:
-                        new_row = {
-                            "owner": row.get("owner", ""),
-                            "date": row.get("date", ""),
-                            "code": row.get("code", ""),
-                            "name": row.get("name", ""),
-                            "side": row.get("side", ""),
-                            "price": row.get("price", ""),
-                            "quantity": row.get("quantity", ""),
-                            "amount": row.get("amount", ""),
-                            "amount_auto": row.get("amount_auto", "") or "0",
+                    dw = csv.DictWriter(f, fieldnames=CSV_HEADERS)
+                    dw.writeheader()
+                    for r in rows:
+                        out = {
+                            "owner": r.get("owner", ""),
+                            "date": r.get("date", ""),
+                            "code": r.get("code", ""),
+                            "platform": r.get("platform", ""),
+                            "side": r.get("side", ""),
+                            "price": r.get("price", ""),
+                            "quantity": r.get("quantity", ""),
                         }
-                        writer.writerow(new_row)
+                        dw.writerow(out)
+        except Exception:
+            # 忽略升级异常，保持文件可读
+            pass
     # 每日备份
     try:
         backups_dir = get_data_dir("backups")
         stamp = datetime.now().strftime("%Y%m%d")
-        backup_file = os.path.join(backups_dir, f"trades_{stamp}.csv")
+        backup_file = os.path.join(backups_dir, f"crypto_trades_{stamp}.csv")
         if os.path.exists(DATA_FILE) and not os.path.exists(backup_file):
             shutil.copy2(DATA_FILE, backup_file)
     except Exception:
@@ -122,24 +121,6 @@ def delete_trade_by_index(index: int) -> bool:
     return True
 
 
-def clear_all_trades(owner: str | None = None) -> None:
-    ensure_data_file()
-    if owner is None:
-        with open(DATA_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(CSV_HEADERS)
-    else:
-        # Keep other users' records
-        with open(DATA_FILE, "r", newline="", encoding="utf-8") as f:
-            dict_reader = csv.DictReader(f)
-            rows = [r for r in dict_reader if (r.get("owner") or "") != owner]
-        with open(DATA_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
-            writer.writeheader()
-            for r in rows:
-                writer.writerow(r)
-
-
 def get_trade_by_display_index(display_index: int, owner: str | None = None) -> Tuple[int, dict] | tuple[None, None]:
     trades = load_trades(owner=owner)
     if display_index < 0 or display_index >= len(trades):
@@ -151,12 +132,10 @@ def get_trade_by_display_index(display_index: int, owner: str | None = None) -> 
             ((trade.get("owner") or "") == (target_trade.get("owner") or "")) and
             trade.get("date") == target_trade.get("date")
             and trade.get("code") == target_trade.get("code")
-            and trade.get("name", "") == target_trade.get("name", "")
+            and (trade.get("platform", "") or "") == (target_trade.get("platform", "") or "")
             and trade.get("side") == target_trade.get("side")
             and trade.get("price") == target_trade.get("price")
             and trade.get("quantity") == target_trade.get("quantity")
-            and trade.get("amount") == target_trade.get("amount")
-            and (trade.get("amount_auto", "") or "0") == (target_trade.get("amount_auto", "") or "0")
         ):
             return orig_index, trade
     return None, None
