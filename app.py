@@ -81,10 +81,8 @@ def admin_users():
             new_user = (request.form.get("username") or "").strip()
             new_pwd = (request.form.get("password") or "").strip()
             is_admin_flag = True if (request.form.get("is_admin") == "on") else False
-            if user_store.create_user(new_user, new_pwd, is_admin_flag):
-                message = "用户创建成功"
-            else:
-                message = "用户已存在或信息不完整"
+            ok, msg = user_store.create_user(new_user, new_pwd, is_admin_flag)
+            message = msg
         elif op == "delete":
             target = (request.form.get("username") or "").strip()
             if target == session.get("user"):

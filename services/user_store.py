@@ -2,6 +2,8 @@ import json
 import os
 import shutil
 import hashlib
+import tempfile
+import threading
 from datetime import datetime
 from typing import List, Dict, Optional
 from services.paths import get_data_dir
@@ -10,6 +12,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 DATA_DIR = get_data_dir("data")
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
+_LOCK = threading.RLock()
 
 
 def _hash(password: str) -> str:
@@ -50,8 +53,15 @@ def _load_users() -> List[Dict]:
 
 
 def _save_users(users: List[Dict]) -> None:
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, ensure_ascii=False, indent=2)
+    ensure_users_file()
+    fd, temp_path = tempfile.mkstemp(prefix="users_", suffix=".json.tmp", dir=DATA_DIR)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+        os.replace(temp_path, USERS_FILE)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 def get_user(username: str) -> Optional[Dict]:
@@ -73,16 +83,23 @@ def is_admin(username: str) -> bool:
     return bool(u and u.get("is_admin"))
 
 
-def create_user(username: str, password: str, is_admin_flag: bool = False) -> bool:
+def create_user(username: str, password: str, is_admin_flag: bool = False) -> tuple[bool, str]:
+    username = (username or "").strip()
+    password = (password or "").strip()
     if not username or not password:
-        return False
-    users = _load_users()
-    for u in users:
-        if u.get("username") == username:
-            return False
-    users.append({"username": username, "password_hash": _hash(password), "is_admin": is_admin_flag})
-    _save_users(users)
-    return True
+        return False, "用户名和密码不能为空"
+    with _LOCK:
+        users = _load_users()
+        for u in users:
+            exist_name = (u.get("username") or "").strip()
+            if exist_name.lower() == username.lower():
+                return False, "用户已存在"
+        users.append({"username": username, "password_hash": _hash(password), "is_admin": is_admin_flag})
+        try:
+            _save_users(users)
+            return True, "用户创建成功"
+        except OSError:
+            return False, "用户创建失败：数据目录无写权限"
 
 
 def list_users() -> List[Dict]:
