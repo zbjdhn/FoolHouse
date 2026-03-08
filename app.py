@@ -17,6 +17,7 @@ import services.user_store as user_store
 import services.analysis as analysis
 import services.snapshot_store as snapshot_store
 import services.crypto_tokens_store as crypto_tokens
+import services.i18n as i18n
 
 try:
     import pandas as pd
@@ -50,6 +51,27 @@ def _ensure_users():
     user_store.ensure_users_file()
 
 
+@app.before_request
+def _apply_lang():
+    q_lang = (request.args.get("lang") or "").strip().lower()
+    if q_lang:
+        i18n.set_lang(q_lang)
+    elif "lang" not in session:
+        i18n.set_lang(i18n.DEFAULT_LANG)
+
+
+@app.context_processor
+def _inject_i18n():
+    return {"t": i18n.t, "lang": i18n.get_lang()}
+
+
+@app.route("/lang/<lang>")
+def switch_lang(lang: str):
+    i18n.set_lang(lang)
+    next_url = request.args.get("next") or request.referrer or url_for("index")
+    return redirect(next_url)
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -61,7 +83,7 @@ def login():
             next_url = request.args.get("next") or url_for("list_trades")
             return redirect(next_url)
         else:
-            flash("用户名或密码错误")
+            flash("用户名或密码错误" if i18n.get_lang() == "zh" else "Invalid username or password")
     return render_template("login.html")
 
 
@@ -105,9 +127,11 @@ def admin_users():
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    need = require_login()
-    if need:
-        return need
+    if not session.get("user"):
+        if request.method == "POST":
+            return redirect(url_for("login", next=request.path))
+        return render_template("home.html", full_width=True)
+
     trade_store.ensure_data_file()
 
     errors: dict[str, str] = {}

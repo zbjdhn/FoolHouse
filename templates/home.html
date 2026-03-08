@@ -1,0 +1,110 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="fh-home">
+  <section class="fh-hero">
+    <div class="fh-grid-bg"></div>
+    <div class="fh-orb fh-orb-a"></div>
+    <div class="fh-orb fh-orb-b"></div>
+    <div class="container-fluid px-4 px-md-5 py-5 position-relative">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-7">
+          <div class="fh-hero-logo fh-reveal">
+            <img src="{{ url_for('static', filename='fullhouse-logo-lockup.svg') }}" alt="FullHouse logo" />
+          </div>
+          <span class="fh-badge fh-reveal">{{ t('home_badge') }}</span>
+          <h1 class="fh-title mt-3 fh-reveal" style="--d: 0.08s;">{{ t('home_title') }}</h1>
+          <p class="fh-subtitle mt-3 fh-reveal" style="--d: 0.15s;">
+            {{ t('home_subtitle') }}
+          </p>
+          <div class="d-flex gap-3 mt-4 flex-wrap fh-reveal" style="--d: 0.22s;">
+            <a class="btn btn-primary btn-lg px-5 fh-btn-primary fh-btn-login" href="{{ url_for('login') }}">{{ t('home_login_now') }}</a>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="fh-panel fh-reveal" style="--d: 0.28s;">
+            <h5 class="mb-3">{{ t('home_snapshot_title') }}</h5>
+            <div class="fh-metric-row"><span>{{ t('home_asset_scope') }}</span><strong>{{ t('home_asset_scope_value') }}</strong></div>
+            <div class="fh-metric-row"><span>{{ t('home_input_mode') }}</span><strong>{{ t('home_input_mode_value') }}</strong></div>
+            <div class="fh-metric-row"><span>{{ t('home_analysis') }}</span><strong>{{ t('home_analysis_value') }}</strong></div>
+            <div class="fh-metric-row"><span>{{ t('home_access') }}</span><strong>{{ t('home_access_value') }}</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container-fluid px-4 px-md-5 py-5">
+    <h2 class="fh-section-title mb-4 fh-on-scroll">{{ t('home_features_title') }}</h2>
+    <div class="row g-4">
+      <div class="col-md-6 col-xl-3">
+        <article class="fh-feature-card fh-on-scroll">
+          <h5>{{ t('home_feature_1_title') }}</h5>
+          <p>{{ t('home_feature_1_desc') }}</p>
+        </article>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <article class="fh-feature-card fh-on-scroll">
+          <h5>{{ t('home_feature_2_title') }}</h5>
+          <p>{{ t('home_feature_2_desc') }}</p>
+        </article>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <article class="fh-feature-card fh-on-scroll">
+          <h5>{{ t('home_feature_3_title') }}</h5>
+          <p>{{ t('home_feature_3_desc') }}</p>
+        </article>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <article class="fh-feature-card fh-on-scroll">
+          <h5>{{ t('home_feature_4_title') }}</h5>
+          <p>{{ t('home_feature_4_desc') }}</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="roadmap" class="container-fluid px-4 px-md-5 pb-5">
+    <h2 class="fh-section-title mb-4 fh-on-scroll">{{ t('home_roadmap_title') }}</h2>
+    <div class="fh-roadmap">
+      <div class="fh-road-item fh-on-scroll">
+        <span class="fh-road-dot"></span>
+        <span class="fh-road-phase">PHASE 01</span>
+        <h5>{{ t('home_phase_1') }}</h5>
+        <p>{{ t('home_phase_1_desc') }}</p>
+      </div>
+      <div class="fh-road-item fh-on-scroll">
+        <span class="fh-road-dot"></span>
+        <span class="fh-road-phase">PHASE 02</span>
+        <h5>{{ t('home_phase_2') }}</h5>
+        <p>{{ t('home_phase_2_desc') }}</p>
+      </div>
+      <div class="fh-road-item fh-on-scroll">
+        <span class="fh-road-dot"></span>
+        <span class="fh-road-phase">PHASE 03</span>
+        <h5>{{ t('home_phase_3') }}</h5>
+        <p>{{ t('home_phase_3_desc') }}</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var nodes = document.querySelectorAll(".fh-on-scroll");
+    if (!("IntersectionObserver" in window)) {
+      nodes.forEach(function (n) { n.classList.add("is-visible"); });
+      return;
+    }
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.16 });
+    nodes.forEach(function (node) { observer.observe(node); });
+  });
+</script>
+{% endblock %}

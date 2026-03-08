@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" role="img" aria-label="FullHouse logo">
+  <defs>
+    <linearGradient id="fhStroke2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#123067" />
+      <stop offset="100%" stop-color="#0a214b" />
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(10 8)">
+    <g fill="none" stroke="url(#fhStroke2)" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M44 104 L128 32 L184 82" stroke-width="14"/>
+      <path d="M58 98 V196 Q58 214 76 214 H180 Q198 214 198 196 V104" stroke-width="14"/>
+      <path d="M206 46 H238 V78" stroke-width="12"/>
+      <path d="M188 96 L238 46" stroke-width="12"/>
+    </g>
+
+    <g fill="#0d2652">
+      <rect x="86" y="166" width="28" height="8" rx="4"/>
+      <rect x="86" y="154" width="28" height="8" rx="4"/>
+      <rect x="86" y="142" width="28" height="8" rx="4"/>
+      <rect x="86" y="130" width="28" height="8" rx="4"/>
+      <circle cx="90" cy="120" r="3.2"/><circle cx="100" cy="120" r="3.2"/><circle cx="110" cy="120" r="3.2"/>
+      <circle cx="90" cy="110" r="3.2"/><circle cx="100" cy="110" r="3.2"/><circle cx="110" cy="110" r="3.2"/>
+
+      <rect x="122" y="166" width="28" height="8" rx="4"/>
+      <rect x="122" y="154" width="28" height="8" rx="4"/>
+      <rect x="122" y="142" width="28" height="8" rx="4"/>
+      <rect x="122" y="130" width="28" height="8" rx="4"/>
+      <rect x="122" y="118" width="28" height="8" rx="4"/>
+      <rect x="122" y="106" width="28" height="8" rx="4"/>
+      <circle cx="126" cy="96" r="3.2"/><circle cx="136" cy="96" r="3.2"/><circle cx="146" cy="96" r="3.2"/>
+      <circle cx="126" cy="86" r="3.2"/><circle cx="136" cy="86" r="3.2"/><circle cx="146" cy="86" r="3.2"/>
+
+      <rect x="158" y="166" width="28" height="8" rx="4"/>
+      <rect x="158" y="154" width="28" height="8" rx="4"/>
+      <rect x="158" y="142" width="28" height="8" rx="4"/>
+      <rect x="158" y="130" width="28" height="8" rx="4"/>
+      <rect x="158" y="118" width="28" height="8" rx="4"/>
+      <rect x="158" y="106" width="28" height="8" rx="4"/>
+      <rect x="158" y="94" width="28" height="8" rx="4"/>
+      <circle cx="162" cy="84" r="3.2"/><circle cx="172" cy="84" r="3.2"/><circle cx="182" cy="84" r="3.2"/>
+      <circle cx="162" cy="74" r="3.2"/><circle cx="172" cy="74" r="3.2"/><circle cx="182" cy="74" r="3.2"/>
+    </g>
+  </g>
+
+  <text x="280" y="184" fill="#0d2652" font-size="104" font-family="'Trebuchet MS', 'Avenir Next', 'Segoe UI', sans-serif" font-weight="600" letter-spacing="1.2">FullHouse</text>
+</svg>
