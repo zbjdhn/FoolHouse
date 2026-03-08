@@ -27,7 +27,11 @@ except ImportError:
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 from services.paths import get_data_dir
-UPLOAD_DIR = os.environ.get("FOOLHOUSE_UPLOAD_DIR") or get_data_dir("uploads")
+UPLOAD_DIR = (
+    os.environ.get("FULLHOUSE_UPLOAD_DIR")
+    or os.environ.get("FOOLHOUSE_UPLOAD_DIR")
+    or get_data_dir("uploads")
+)
 
 
 app = Flask(__name__)
