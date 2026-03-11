@@ -49,12 +49,12 @@
               <td>{{ u.username }}</td>
               <td>{{ '管理员' if u.is_admin else '普通用户' }}</td>
               <td class="text-center">
-                <form method="post" class="d-inline-flex align-items-center justify-content-center gap-2">
-                  <input type="hidden" name="op" value="reset_pwd">
-                  <input type="hidden" name="username" value="{{ u.username }}">
-                  <input type="password" name="password" class="form-control form-control-sm" placeholder="新密码" style="width: 140px;" required>
-                  <button type="submit" class="btn btn-sm btn-outline-primary">修改</button>
-                </form>
+                <button type="button" class="btn btn-sm btn-outline-primary" 
+                        data-bs-toggle="modal" 
+                        data-bs-target="#resetPwdModal" 
+                        data-bs-username="{{ u.username }}">
+                  修改
+                </button>
               </td>
               <td class="text-center">
                 <form method="post" onsubmit="return confirm('确定删除用户 {{ u.username }} 吗？');" class="d-inline">
@@ -71,4 +71,53 @@
     </div>
   </div>
 </div>
+
+<!-- 重置密码弹窗 -->
+<div class="modal fade" id="resetPwdModal" tabindex="-1" aria-labelledby="resetPwdModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <form method="post">
+        <div class="modal-header">
+          <h5 class="modal-title" id="resetPwdModalLabel">重置密码</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="op" value="reset_pwd">
+          <input type="hidden" name="username" id="reset_username_input">
+          <div class="mb-3">
+            <label class="form-label">用户：<span id="reset_username_display" class="fw-bold"></span></label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">新密码</label>
+            <input type="password" name="password" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">确认新密码</label>
+            <input type="password" name="confirm_password" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">提交修改</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  const resetPwdModal = document.getElementById('resetPwdModal')
+  if (resetPwdModal) {
+    resetPwdModal.addEventListener('show.bs.modal', event => {
+      const button = event.relatedTarget
+      const username = button.getAttribute('data-bs-username')
+      
+      const usernameInput = resetPwdModal.querySelector('#reset_username_input')
+      const usernameDisplay = resetPwdModal.querySelector('#reset_username_display')
+
+      usernameInput.value = username
+      usernameDisplay.textContent = username
+    })
+  }
+</script>
 {% endblock %}

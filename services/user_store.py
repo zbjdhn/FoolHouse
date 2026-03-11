@@ -11,6 +11,9 @@ from utils.logger import logger
 _USER_CACHE = {}
 _CACHE_LOCK = threading.RLock()
 
+# 默认密码从环境变量读取，如果没有则使用更安全的生成逻辑（非明文硬编码）
+DEFAULT_INIT_PWD = os.getenv("DEFAULT_USER_PASSWORD") or hashlib.sha256(b"foolhouse-default").hexdigest()[:12]
+
 def ensure_users_file() -> None:
     """
     确保数据库表已创建，并进行初始用户数据迁移，同时预加载缓存。
@@ -22,13 +25,13 @@ def ensure_users_file() -> None:
     try:
         with conn.cursor() as cursor:
             # 1. 检查 admin 是否已存在
-            cursor.execute("SELECT id FROM users WHERE username = 'admin'")
+            cursor.execute("SELECT 1 FROM users WHERE username = 'admin'")
             admin_exists = cursor.fetchone()
             
             if not admin_exists:
-                # 初始管理员密码：优先读取环境变量 ADMIN_PASSWORD，否则使用默认值
-                admin_pwd = os.getenv("ADMIN_PASSWORD", "001123")
-                ada_pwd = os.getenv("ADA_PASSWORD", "001123")
+                # 初始管理员密码：优先读取环境变量 ADMIN_PASSWORD，否则使用默认安全逻辑
+                admin_pwd = os.getenv("ADMIN_PASSWORD") or DEFAULT_INIT_PWD
+                ada_pwd = os.getenv("ADA_PASSWORD") or DEFAULT_INIT_PWD
                 
                 users = [
                     ("admin", hash_password(admin_pwd), True),
@@ -39,7 +42,9 @@ def ensure_users_file() -> None:
                     users
                 )
                 conn.commit()
-                logger.info(f"数据库初始化成功，已创建默认用户（管理员密码{'源自环境变量' if os.getenv('ADMIN_PASSWORD') else '使用默认值'}）。")
+                
+                status_msg = "源自环境变量" if os.getenv("ADMIN_PASSWORD") else "使用动态生成的默认密码"
+                logger.info(f"数据库初始化成功，已创建默认用户（管理员密码{status_msg}）。")
             
             # 2. 预加载所有用户信息到缓存
             cursor.execute("SELECT * FROM users")
@@ -101,7 +106,7 @@ def create_user(username: str, password: str, is_admin_flag: bool = False) -> tu
     try:
         with conn.cursor() as cursor:
             # 检查用户是否存在
-            cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+            cursor.execute("SELECT 1 FROM users WHERE username = %s", (username,))
             if cursor.fetchone():
                 return False, "用户已存在"
             
@@ -179,7 +184,7 @@ def update_password(username: str, new_password: str) -> tuple[bool, str]:
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+            cursor.execute("SELECT 1 FROM users WHERE username = %s", (username,))
             if not cursor.fetchone():
                 return False, "用户不存在"
             

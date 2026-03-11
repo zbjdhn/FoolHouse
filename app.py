@@ -98,6 +98,36 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/change_password", methods=["GET", "POST"])
+def change_password():
+    need = require_login()
+    if need:
+        return need
+    
+    if request.method == "POST":
+        old_pwd = (request.form.get("old_password") or "").strip()
+        new_pwd = (request.form.get("new_password") or "").strip()
+        confirm_pwd = (request.form.get("confirm_password") or "").strip()
+        
+        username = session.get("user")
+        
+        if not user_store.verify_password(username, old_pwd):
+            flash("当前密码错误" if i18n.get_lang() == "zh" else "Current password incorrect")
+        elif not new_pwd:
+            flash("新密码不能为空" if i18n.get_lang() == "zh" else "New password cannot be empty")
+        elif new_pwd != confirm_pwd:
+            flash("两次输入的新密码不一致" if i18n.get_lang() == "zh" else "New passwords do not match")
+        else:
+                success, msg = user_store.update_password(username, new_pwd)
+                if success:
+                    flash("密码修改成功" if i18n.get_lang() == "zh" else "Password updated successfully")
+                    return redirect(url_for("list_trades"))
+                else:
+                    flash(msg)
+                
+    return render_template("change_password.html", is_profile=True)
+
+
 @app.route("/admin/users", methods=["GET", "POST"])
 def admin_users():
     if not session.get("user"):
@@ -124,10 +154,16 @@ def admin_users():
         elif op == "reset_pwd":
             target = (request.form.get("username") or "").strip()
             new_pwd = (request.form.get("password") or "").strip()
-            ok, msg = user_store.update_password(target, new_pwd)
-            message = msg
+            confirm_pwd = (request.form.get("confirm_password") or "").strip()
+            if not new_pwd:
+                message = "新密码不能为空"
+            elif new_pwd != confirm_pwd:
+                message = "两次输入的新密码不一致"
+            else:
+                ok, msg = user_store.update_password(target, new_pwd)
+                message = msg
     users = user_store.list_users()
-    return render_template("admin_users.html", users=users, message=message)
+    return render_template("admin_users.html", users=users, message=message, is_profile=True)
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -772,7 +808,7 @@ def admin_crypto_tokens():
             message = "已批准并加入白名单" if ok else "批准失败"
     tokens = crypto_tokens.list_tokens()
     requests = crypto_tokens.list_requests()
-    return render_template("admin_crypto_tokens.html", tokens=tokens, requests=requests, message=message)
+    return render_template("admin_crypto_tokens.html", tokens=tokens, requests=requests, message=message, is_profile=True)
 
 if __name__ == "__main__":
     app.run(debug=True)

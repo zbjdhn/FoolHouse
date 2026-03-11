@@ -96,6 +96,11 @@ def init_db():
             )
             """)
 
+            # 兼容性处理：如果 trades 表已存在但没有 id 列，记录日志提示（TiDB 不支持 ALTER 添加 AUTO_INCREMENT）
+            cursor.execute("SHOW COLUMNS FROM trades LIKE 'id'")
+            if not cursor.fetchone():
+                logger.warning("检测到 'trades' 表缺少 'id' 列。若需要使用基于 ID 的功能，请手动重建该表。")
+
             # 创建 users 表
             logger.info(f"正在检查或创建数据库表 'users'...")
             cursor.execute("""
@@ -107,6 +112,12 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """)
+
+            # 兼容性处理：如果 users 表已存在但没有 id 列，记录日志提示（TiDB 不支持 ALTER 添加 AUTO_INCREMENT）
+            cursor.execute("SHOW COLUMNS FROM users LIKE 'id'")
+            if not cursor.fetchone():
+                logger.warning("检测到 'users' 表缺少 'id' 列。若需要使用基于 ID 的功能，请手动重建该表。")
+
         conn.commit()
         logger.info("数据库初始化完成。")
     finally:

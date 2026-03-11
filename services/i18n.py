@@ -5,12 +5,14 @@ SUPPORTED_LANGS = {"zh", "en"}
 DEFAULT_LANG = "zh"
 
 MESSAGES = {
-    "brand_slogan": {"zh": "一个面向交易者的数据分析系统", "en": "a data analysis system for traders"},
+    "brand_slogan": {"zh": "一个面向交易者的数据分析系统", "en": "a da system for traders"},
     "nav_a_share": {"zh": "A股", "en": "A-Share"},
     "nav_crypto": {"zh": "Crypto", "en": "Crypto"},
     "nav_user_admin": {"zh": "用户管理", "en": "User Admin"},
     "nav_crypto_whitelist": {"zh": "Crypto 白名单", "en": "Crypto Whitelist"},
     "nav_hello": {"zh": "您好", "en": "Hi"},
+    "nav_profile": {"zh": "个人中心", "en": "Profile"},
+    "nav_change_password": {"zh": "修改密码", "en": "Change Password"},
     "nav_logout": {"zh": "退出", "en": "Logout"},
     "nav_login": {"zh": "登录", "en": "Login"},
     "nav_lang_zh": {"zh": "中文", "en": "中文"},

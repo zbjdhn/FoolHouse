@@ -52,10 +52,21 @@ def load_trades(owner: str | None = None) -> List[dict]:
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            if owner:
-                cursor.execute("SELECT * FROM trades WHERE owner = %s ORDER BY date DESC, id DESC", (owner,))
-            else:
-                cursor.execute("SELECT * FROM trades ORDER BY date DESC, id DESC")
+            # 优先使用 id 排序，如果不存在 id 则回退到 created_at
+            order_by = "ORDER BY date DESC, id DESC"
+            try:
+                if owner:
+                    cursor.execute(f"SELECT * FROM trades WHERE owner = %s {order_by}", (owner,))
+                else:
+                    cursor.execute(f"SELECT * FROM trades {order_by}")
+            except Exception:
+                # 兼容老旧表结构（没有 id 列）
+                order_by = "ORDER BY date DESC, created_at DESC"
+                if owner:
+                    cursor.execute(f"SELECT * FROM trades WHERE owner = %s {order_by}", (owner,))
+                else:
+                    cursor.execute(f"SELECT * FROM trades {order_by}")
+            
             trades = cursor.fetchall()
             
             # 转换为与之前 CSV 读取一致的格式（主要是数值转字符串）
@@ -81,7 +92,8 @@ def load_all_trades_with_index() -> List[Tuple[int, dict]]:
             trades = cursor.fetchall()
             result = []
             for t in trades:
-                db_id = t.pop('id')
+                # 兼容缺少 id 列的情况
+                db_id = t.pop('id', 0)
                 t['price'] = str(t['price'])
                 t['quantity'] = str(t['quantity'])
                 t['amount'] = str(t['amount'])
@@ -96,6 +108,10 @@ def update_trade_by_index(db_id: int, updated_trade: dict) -> bool:
     """
     根据数据库 ID 更新交易记录
     """
+    if not db_id:
+        logger.error("无法更新交易：缺少有效的数据库 ID。")
+        return False
+        
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
@@ -124,6 +140,10 @@ def delete_trade_by_index(db_id: int) -> bool:
     """
     根据数据库 ID 删除交易记录
     """
+    if not db_id:
+        logger.error("无法删除交易：缺少有效的数据库 ID。")
+        return False
+        
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:

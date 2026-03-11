@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   </head>
   <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 sticky-top">
       <div class="container-fluid">
         <a class="navbar-brand p-0 fh-brand-lockup" href="{{ url_for('index') }}">
           <img class="fh-brand-logo" src="{{ url_for('static', filename='fullhouse-logo-mark.svg') }}" alt="FullHouse logo" />
@@ -45,37 +45,85 @@
             </li>
           </ul>
           {% endif %}
-          <ul class="navbar-nav ms-auto">
+          <ul class="navbar-nav ms-auto align-items-center">
             {% if session.get('user') %}
-              {% if session.get('is_admin') %}
-              <li class="nav-item">
-                <a class="nav-link admin-link me-2{% if request.endpoint == 'admin_users' %} active{% endif %}" href="{{ url_for('admin_users') }}">{{ t('nav_user_admin') }}</a>
+              <li class="nav-item dropdown me-2">
+                <a class="nav-link dropdown-toggle lang-dropdown-btn py-1 px-2 small-nav-btn" href="#" id="langDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-translate me-1" viewBox="0 0 16 16">
+                    <path d="M4.545 6.714 4.11 8H3l1.862-5h1.284L8 8H6.833l-.435-1.286zm1.634-.736L5.5 3.956h-.049l-.679 2.022z"/>
+                    <path d="M0 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zm7.138 9.995q.289.451.63.846c-.197.154-.467.264-.767.339h-.133a1 1 0 0 0-.113.013L8 11.239V10h1zm.613-1.583q-.278-.446-.52-.858H7.031L5.641 8H4.11l.505 1.5H5.7l.333-1h1.232l.333 1z"/>
+                  </svg>
+                  <span class="small">{{ t('nav_lang_zh') if lang == 'zh' else t('nav_lang_en') }}</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="langDropdown">
+                  <li><a class="dropdown-item py-1 px-3 small{% if lang == 'zh' %} active{% endif %}" href="{{ url_for('switch_lang', lang='zh', next=request.full_path) }}">{{ t('nav_lang_zh') }}</a></li>
+                  <li><a class="dropdown-item py-1 px-3 small{% if lang == 'en' %} active{% endif %}" href="{{ url_for('switch_lang', lang='en', next=request.full_path) }}">{{ t('nav_lang_en') }}</a></li>
+                </ul>
               </li>
-              <li class="nav-item">
-                <a class="nav-link admin-link me-2{% if request.endpoint == 'admin_crypto_tokens' %} active{% endif %}" href="{{ url_for('admin_crypto_tokens') }}">{{ t('nav_crypto_whitelist') }}</a>
-              </li>
-              {% endif %}
-              <li class="nav-item">
-                <div class="lang-switch me-2">
-                  <a class="lang-seg{% if lang == 'zh' %} active{% endif %}" href="{{ url_for('switch_lang', lang='zh', next=request.full_path) }}">{{ t('nav_lang_zh') }}</a>
-                  <a class="lang-seg{% if lang == 'en' %} active{% endif %}" href="{{ url_for('switch_lang', lang='en', next=request.full_path) }}">{{ t('nav_lang_en') }}</a>
-                </div>
-              </li>
-              <li class="nav-item">
-                <span class="navbar-text user-greeting me-2">{{ t('nav_hello') }}，{{ session.get('user') }}</span>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link nav-action-link" href="{{ url_for('logout') }}">{{ t('nav_logout') }}</a>
+              <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle nav-profile-btn py-1 px-3" href="#" id="profileDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  <div class="d-inline-flex align-items-center">
+                    <div class="profile-avatar-sm me-2">
+                      {{ session.get('user')[0].upper() }}
+                    </div>
+                    <span>{{ session.get('user') }}</span>
+                  </div>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end shadow-lg profile-dropdown-menu" aria-labelledby="profileDropdown">
+                  <li><h6 class="dropdown-header d-flex align-items-center opacity-75">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="bi bi-person me-2" viewBox="0 0 16 16">
+                      <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/>
+                    </svg>{{ t('nav_profile') }}
+                  </h6></li>
+                  <li><a class="dropdown-item{% if request.endpoint == 'change_password' %} active{% endif %}" href="{{ url_for('change_password') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-key-fill me-2" viewBox="0 0 16 16">
+                      <path d="M3.5 11.5a3.5 3.5 0 1 1 3.163-5H14L15.5 8 14 9.5l-1-1-1 1-1-1-1 1-1-1-1 1H6.663A3.5 3.5 0 0 1 3.5 11.5m0-1a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/>
+                    </svg>{{ t('nav_change_password') }}
+                  </a></li>
+                  {% if session.get('is_admin') %}
+                  <li><hr class="dropdown-divider opacity-50"></li>
+                  <li><h6 class="dropdown-header d-flex align-items-center opacity-75">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="bi bi-shield-lock me-2" viewBox="0 0 16 16">
+                      <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1"/>
+                    </svg>{{ t('nav_user_admin') }}
+                  </h6></li>
+                  <li><a class="dropdown-item{% if request.endpoint == 'admin_users' %} active{% endif %}" href="{{ url_for('admin_users') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-people-fill me-2" viewBox="0 0 16 16">
+                      <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/>
+                    </svg>{{ t('nav_user_admin') }}
+                  </a></li>
+                  <li><a class="dropdown-item{% if request.endpoint == 'admin_crypto_tokens' %} active{% endif %}" href="{{ url_for('admin_crypto_tokens') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-shield-check me-2" viewBox="0 0 16 16">
+                      <path d="M8 14.933a.615.615 0 0 0 .1-.025c.076-.023.174-.061.294-.118.24-.113.547-.29.893-.533a10.7 10.7 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067c-.53 0-1.552.223-2.662.53-1.087.295-2.186.642-2.837.856a.48.48 0 0 0-.328.39c-.554 4.157.726 7.19 2.253 9.188a10.7 10.7 0 0 0 2.288 2.233c.346.244.652.42.893.533.12.057.218.095.294.118a.6.6 0 0 0 .101.025zM8 15c-.131 0-.252-.031-.352-.084-.336-.178-.65-.382-.937-.597a11.7 11.7 0 0 1-2.527-2.467c-1.638-2.14-2.924-5.423-2.31-9.728a.5.5 0 0 1 .341-.413 24 24 0 0 1 3.033-.993c1.11-.302 2.155-.536 2.747-.536s1.637.234 2.747.536a24 24 0 0 1 3.033.993.5.5 0 0 1 .341.413c.614 4.305-.672 7.588-2.31 9.728a11.7 11.7 0 0 1-2.527 2.467c-.287.215-.6.419-.937.597-.1.053-.221.084-.352.084"/>
+                      <path d="M10.854 6.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 8.793l2.646-2.647a.5.5 0 0 1 .708 0"/>
+                    </svg>{{ t('nav_crypto_whitelist') }}
+                  </a></li>
+                  {% endif %}
+                  <li><hr class="dropdown-divider opacity-50"></li>
+                  <li><a class="dropdown-item text-danger py-2" href="{{ url_for('logout') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-box-arrow-right me-2" viewBox="0 0 16 16">
+                      <path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0z"/>
+                      <path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708z"/>
+                    </svg>{{ t('nav_logout') }}
+                  </a></li>
+                </ul>
               </li>
             {% else %}
-              <li class="nav-item">
-                <div class="lang-switch me-2">
-                  <a class="lang-seg{% if lang == 'zh' %} active{% endif %}" href="{{ url_for('switch_lang', lang='zh', next=request.full_path) }}">{{ t('nav_lang_zh') }}</a>
-                  <a class="lang-seg{% if lang == 'en' %} active{% endif %}" href="{{ url_for('switch_lang', lang='en', next=request.full_path) }}">{{ t('nav_lang_en') }}</a>
-                </div>
+              <li class="nav-item dropdown me-2">
+                <a class="nav-link dropdown-toggle lang-dropdown-btn py-1 px-2 small-nav-btn" href="#" id="guestLangDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-translate me-1" viewBox="0 0 16 16">
+                    <path d="M4.545 6.714 4.11 8H3l1.862-5h1.284L8 8H6.833l-.435-1.286zm1.634-.736L5.5 3.956h-.049l-.679 2.022z"/>
+                    <path d="M0 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zm7.138 9.995q.289.451.63.846c-.197.154-.467.264-.767.339h-.133a1 1 0 0 0-.113.013L8 11.239V10h1zm.613-1.583q-.278-.446-.52-.858H7.031L5.641 8H4.11l.505 1.5H5.7l.333-1h1.232l.333 1z"/>
+                  </svg>
+                  <span class="small">{{ t('nav_lang_zh') if lang == 'zh' else t('nav_lang_en') }}</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="guestLangDropdown">
+                  <li><a class="dropdown-item py-1 px-3 small{% if lang == 'zh' %} active{% endif %}" href="{{ url_for('switch_lang', lang='zh', next=request.full_path) }}">{{ t('nav_lang_zh') }}</a></li>
+                  <li><a class="dropdown-item py-1 px-3 small{% if lang == 'en' %} active{% endif %}" href="{{ url_for('switch_lang', lang='en', next=request.full_path) }}">{{ t('nav_lang_en') }}</a></li>
+                </ul>
               </li>
               <li class="nav-item">
-                <a class="nav-link nav-login-btn{% if request.endpoint == 'login' %} active{% endif %}" href="{{ url_for('login') }}">{{ t('nav_login') }}</a>
+                <a class="nav-link nav-login-btn py-1 px-3" href="{{ url_for('login') }}">{{ t('nav_login') }}</a>
               </li>
             {% endif %}
           </ul>
@@ -83,9 +131,9 @@
       </div>
     </nav>
 
-    <main class="{% if is_equity or is_crypto or full_width %}container-fluid px-0{% else %}container{% endif %} mb-4">
+    <main class="{% if is_equity or is_crypto or is_profile or full_width %}container-fluid px-0{% else %}container{% endif %} mb-4">
       <div class="row g-0">
-        <aside class="sidebar col-md-3 col-lg-2 mb-3 border-end bg-light" {% if not (is_equity or is_crypto) %}style="display: none;"{% endif %}>
+        <aside class="sidebar col-md-3 col-lg-2 mb-3 border-end bg-light" {% if not (is_equity or is_crypto or is_profile) %}style="display: none;"{% endif %}>
           {% if is_equity %}
             <div class="list-group list-group-flush mb-3 rounded-0">
               <div class="list-group-item sidebar-section-title">{{ t('sidebar_database') }}</div>
@@ -104,9 +152,19 @@
               <a href="{{ url_for('crypto_list_trades') }}" class="list-group-item list-group-item-action sidebar-subitem{% if crypto_active == 'trades' %} active{% endif %}">{{ t('sidebar_trade_records') }}</a>
               <a href="{{ url_for('crypto_transfers') }}" class="list-group-item list-group-item-action sidebar-subitem{% if crypto_active == 'transfers' %} active{% endif %}">{{ t('sidebar_fiat_transfers') }}</a>
             </div>
+          {% elif is_profile %}
+            <div class="list-group list-group-flush mb-3 rounded-0">
+              <div class="list-group-item sidebar-section-title">{{ t('nav_profile') }}</div>
+              <a href="{{ url_for('change_password') }}" class="list-group-item list-group-item-action sidebar-subitem{% if request.endpoint == 'change_password' %} active{% endif %}">{{ t('nav_change_password') }}</a>
+              {% if session.get('is_admin') %}
+                <div class="list-group-item sidebar-section-title mt-3">{{ t('nav_user_admin') }}</div>
+                <a href="{{ url_for('admin_users') }}" class="list-group-item list-group-item-action sidebar-subitem{% if request.endpoint == 'admin_users' %} active{% endif %}">{{ t('nav_user_admin') }}</a>
+                <a href="{{ url_for('admin_crypto_tokens') }}" class="list-group-item list-group-item-action sidebar-subitem{% if request.endpoint == 'admin_crypto_tokens' %} active{% endif %}">{{ t('nav_crypto_whitelist') }}</a>
+              {% endif %}
+            </div>
           {% endif %}
         </aside>
-        <section class="{% if is_equity or is_crypto %}col-md-9 col-lg-10 px-3 px-md-4{% else %}col-12{% endif %}">
+        <section class="{% if is_equity or is_crypto or is_profile %}col-md-9 col-lg-10 px-3 px-md-4{% else %}col-12{% endif %}">
           {% with messages = get_flashed_messages() %}
             {% if messages %}
               <div class="alert alert-success" role="alert">
