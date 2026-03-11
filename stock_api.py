@@ -10,6 +10,7 @@ import urllib.error
 from typing import Optional, Dict, List
 from cachetools import TTLCache
 from utils.stock import normalize_stock_code
+from utils.logger import logger
 
 # 专业缓存：TTL=30分钟 (1800s), 最大容量 1000 条
 # 同时保留一个"最近成功"的兜底存储，用于接口挂掉时显示过期数据
@@ -64,6 +65,7 @@ def fetch_stock_info(code: str, retry_count: int = 2) -> Dict[str, Optional[str]
                     return {"name": res["name"], "current_price": str(price), "error": None, "cached": False}
         except Exception as e:
             last_error = str(e)
+            logger.debug(f"从数据源获取股票 {code} 失败: {last_error}")
             time.sleep(0.3)
 
     # 3. 如果所有尝试都失败，且 TTLCache 已过期，从兜底存储获取过期数据
@@ -117,11 +119,15 @@ def fetch_batch_stock_info(codes: List[str]) -> Dict[str, Dict[str, Optional[str
                             result[nc] = item
                             _PRICE_CACHE[nc] = {"name": name, "price": price}
                             _LAST_KNOWN_GOOD[nc] = {"name": name, "price": price}
-                    except: pass
-    except:
+                    except Exception as e:
+                        logger.warning(f"解析批量股票数据片段失败: {e}")
+    except Exception as e:
+        logger.error(f"批量请求股票数据失败: {e}")
+        # 批量请求失败，降级为逐个重试模式
         for c in missing:
             info = fetch_stock_info(c, retry_count=1)
-            if info.get("name"): result[c] = info
+            if info.get("name"):
+                result[c] = info
             
     return result
 

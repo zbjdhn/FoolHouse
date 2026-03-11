@@ -1,9 +1,11 @@
 import hashlib
 import pymysql
 import threading
+import os
 from typing import List, Dict, Optional
 from services.db import get_db_connection, init_db
 from utils.security import hash_password
+from utils.logger import logger
 
 # 用户信息内存缓存
 _USER_CACHE = {}
@@ -11,28 +13,35 @@ _CACHE_LOCK = threading.RLock()
 
 def ensure_users_file() -> None:
     """
-    确保数据库表已创建，并进行初始用户数据迁移，同时预加载缓存
+    确保数据库表已创建，并进行初始用户数据迁移，同时预加载缓存。
+    优先从环境变量读取管理员密码。
     """
     init_db()
     # 检查是否需要迁移
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT COUNT(*) as count FROM users")
-            count = cursor.fetchone()['count']
-            if count == 0:
-                # 初始用户
+            # 1. 检查 admin 是否已存在
+            cursor.execute("SELECT id FROM users WHERE username = 'admin'")
+            admin_exists = cursor.fetchone()
+            
+            if not admin_exists:
+                # 初始管理员密码：优先读取环境变量 ADMIN_PASSWORD，否则使用默认值
+                admin_pwd = os.getenv("ADMIN_PASSWORD", "001123")
+                ada_pwd = os.getenv("ADA_PASSWORD", "001123")
+                
                 users = [
-                    ("admin", hash_password("001123"), True),
-                    ("ada", hash_password("001123"), False),
+                    ("admin", hash_password(admin_pwd), True),
+                    ("ada", hash_password(ada_pwd), False),
                 ]
                 cursor.executemany(
                     "INSERT INTO users (username, password_hash, is_admin) VALUES (%s, %s, %s)",
                     users
                 )
                 conn.commit()
+                logger.info(f"数据库初始化成功，已创建默认用户（管理员密码{'源自环境变量' if os.getenv('ADMIN_PASSWORD') else '使用默认值'}）。")
             
-            # 预加载所有用户信息到缓存
+            # 2. 预加载所有用户信息到缓存
             cursor.execute("SELECT * FROM users")
             all_users = cursor.fetchall()
             with _CACHE_LOCK:

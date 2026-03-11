@@ -4,6 +4,7 @@ import shutil
 from datetime import datetime
 from typing import Optional
 from utils.paths import get_data_dir
+from utils.logger import logger
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 

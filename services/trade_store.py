@@ -2,6 +2,7 @@ import os
 import pymysql
 from typing import List, Tuple
 from services.db import get_db_connection, init_db
+from utils.logger import logger
 
 # CSV 相关的常量保留，用于可能的迁移
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -16,7 +17,7 @@ def ensure_data_file() -> None:
     try:
         init_db()
     except Exception as e:
-        print(f"初始化数据库失败: {e}")
+        logger.error(f"初始化数据库失败: {e}")
 
 def append_trade(trade: dict) -> None:
     """

@@ -3,6 +3,7 @@ import os
 import certifi
 from dotenv import load_dotenv
 from dbutils.pooled_db import PooledDB
+from utils.logger import logger
 
 # 加载 .env 文件
 load_dotenv()
@@ -47,14 +48,14 @@ def init_db():
     """
     db_name = os.getenv("DB_DATABASE")
     if db_name == "sys":
-        print("警告: 正在尝试连接 'sys' 库。这在云数据库上通常会因为权限不足而失败。请在环境变量中更换数据库名。")
+        logger.warning("正在尝试连接 'sys' 库。这在云数据库上通常会因为权限不足而失败。请在环境变量中更换数据库名。")
 
     # 1. 尝试直接连接目标库（如果库已存在，这是最安全的方式）
     try:
         conn = get_db_connection()
     except Exception as e:
         # 如果连接失败，尝试连接服务器并创建数据库
-        print(f"无法直接连接到库 '{db_name}'，尝试自动创建: {e}")
+        logger.info(f"无法直接连接到库 '{db_name}'，尝试自动创建: {e}")
         try:
             temp_conn = pymysql.connect(
                 host=os.getenv("DB_HOST"),
@@ -70,14 +71,15 @@ def init_db():
             # 创建完后再次尝试获取池连接
             conn = get_db_connection()
         except Exception as e_create:
-            print(f"严重错误: 无法创建数据库 '{db_name}'。权限不足或连接失败: {e_create}")
-            print("提示: 请在 TiDB Cloud 控制台手动创建数据库并更新环境变量。")
+            logger.error(f"严重错误: 无法创建数据库 '{db_name}'。权限不足或连接失败: {e_create}")
+            logger.info("提示: 请在 TiDB Cloud 控制台手动创建数据库并更新环境变量。")
             return
 
     # 2. 从池中获取连接并创建表
     try:
         with conn.cursor() as cursor:
             # 创建 trades 表
+            logger.info(f"正在检查或创建数据库表 'trades'...")
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS trades (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -95,6 +97,7 @@ def init_db():
             """)
 
             # 创建 users 表
+            logger.info(f"正在检查或创建数据库表 'users'...")
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -105,5 +108,6 @@ def init_db():
             )
             """)
         conn.commit()
+        logger.info("数据库初始化完成。")
     finally:
         conn.close()

@@ -3,13 +3,14 @@ import os
 import pymysql
 from services.db import get_db_connection, init_db
 from services.trade_store import DATA_FILE, CSV_HEADERS
+from utils.logger import logger
 
 def migrate_data():
     """
     从 CSV 迁移数据到 MySQL (使用 PyMySQL)
     """
     if not os.path.exists(DATA_FILE):
-        print(f"CSV 文件 {DATA_FILE} 不存在，跳过迁移。")
+        logger.info(f"CSV 文件 {DATA_FILE} 不存在，跳过迁移。")
         return
 
     init_db()  # 确保表已创建
@@ -21,17 +22,17 @@ def migrate_data():
             cursor.execute("SELECT COUNT(*) as count FROM trades")
             count = cursor.fetchone()['count']
             if count > 0:
-                print("数据库表 'trades' 已有数据，跳过自动迁移。")
+                logger.info("数据库表 'trades' 已有数据，跳过自动迁移。")
                 return
 
-            print(f"正在从 {DATA_FILE} 迁移数据到数据库...")
+            logger.info(f"正在从 {DATA_FILE} 迁移数据到数据库...")
             
             with open(DATA_FILE, "r", newline="", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 trades = list(reader)
             
             if not trades:
-                print("CSV 文件为空，跳过迁移。")
+                logger.info("CSV 文件为空，跳过迁移。")
                 return
 
             sql = """
@@ -55,7 +56,7 @@ def migrate_data():
             
             cursor.executemany(sql, values)
             conn.commit()
-            print(f"成功迁移 {len(values)} 条记录。")
+            logger.info(f"成功迁移 {len(values)} 条记录。")
     finally:
         conn.close()
 
@@ -63,4 +64,4 @@ if __name__ == "__main__":
     try:
         migrate_data()
     except Exception as e:
-        print(f"发生错误: {e}")
+        logger.error(f"发生错误: {e}")

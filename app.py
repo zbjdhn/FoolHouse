@@ -19,6 +19,7 @@ import services.snapshot_store as snapshot_store
 import services.crypto_tokens_store as crypto_tokens
 import services.i18n as i18n
 from utils.date_utils import format_date_to_str
+from utils.logger import logger
 
 try:
     import pandas as pd
@@ -38,6 +39,13 @@ UPLOAD_DIR = (
 
 app = Flask(__name__)
 app.secret_key = "dev-secret-key-change-me"
+
+# 初始化数据库（确保在 Vercel 部署等 WSGI 环境下也能运行）
+with app.app_context():
+    try:
+        user_store.ensure_users_file()
+    except Exception as e:
+        logger.error(f"应用启动初始化数据库失败: {e}")
 
 
 
@@ -767,5 +775,4 @@ def admin_crypto_tokens():
     return render_template("admin_crypto_tokens.html", tokens=tokens, requests=requests, message=message)
 
 if __name__ == "__main__":
-    user_store.ensure_users_file()
     app.run(debug=True)

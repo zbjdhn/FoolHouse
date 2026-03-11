@@ -1,6 +1,7 @@
 import pandas as pd
 from typing import List, Dict
 from utils.constants import SIDE_BUY, SIDE_SELL, SIDE_DIVIDEND, SIDE_SUBSCRIPTION
+from utils.logger import logger
 
 def compute_positions(trades: List[Dict]) -> List[Dict]:
     if not trades:

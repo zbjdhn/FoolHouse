@@ -1,10 +1,11 @@
 from flask import session
+from utils.logger import logger
 
 SUPPORTED_LANGS = {"zh", "en"}
 DEFAULT_LANG = "zh"
 
 MESSAGES = {
-    "brand_slogan": {"zh": "一个面向交易者的数据分析系统", "en": "a da system for traders"},
+    "brand_slogan": {"zh": "一个面向交易者的数据分析系统", "en": "a data analysis system for traders"},
     "nav_a_share": {"zh": "A股", "en": "A-Share"},
     "nav_crypto": {"zh": "Crypto", "en": "Crypto"},
     "nav_user_admin": {"zh": "用户管理", "en": "User Admin"},
@@ -74,7 +75,10 @@ def set_lang(lang: str) -> str:
         return DEFAULT_LANG
     lang = lang.lower()
     if lang not in SUPPORTED_LANGS:
+        logger.warning(f"不支持的语言: {lang}，回退到默认语言: {DEFAULT_LANG}")
         lang = DEFAULT_LANG
+    else:
+        logger.debug(f"设置语言为: {lang}")
     session["lang"] = lang
     return lang
 
