@@ -1,6 +1,6 @@
 import pandas as pd
 from typing import List, Dict
-
+from utils.constants import SIDE_BUY, SIDE_SELL, SIDE_DIVIDEND, SIDE_SUBSCRIPTION
 
 def compute_positions(trades: List[Dict]) -> List[Dict]:
     if not trades:
@@ -30,17 +30,17 @@ def compute_positions(trades: List[Dict]) -> List[Dict]:
             if n and not nm:
                 nm = n
             net_cash_sum += a
-            if s in ("证券买入", "配售申购"):
+            if s in (SIDE_BUY, SIDE_SUBSCRIPTION):
                 if q > 0:
                     cost += abs(a)
                     shares += q
-            elif s == "证券卖出":
+            elif s == SIDE_SELL:
                 if q > 0 and shares > 0:
                     avg = cost / shares if shares > 0 else 0.0
                     r = min(q, shares)
                     shares -= r
                     cost = max(0.0, cost - avg * r)
-            elif s == "红股入账":
+            elif s == SIDE_DIVIDEND:
                 if q > 0:
                     shares += q
         # 绝对成本价：净投入金额 / 当前持股数，其中净投入= -签名金额求和（买入为投入）

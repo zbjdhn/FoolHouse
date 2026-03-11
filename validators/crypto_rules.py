@@ -1,3 +1,6 @@
+from utils.date_utils import format_date_to_str
+from utils.constants import VALID_CRYPTO_SIDES
+
 def validate_and_build_trade(form) -> tuple[dict, dict]:
     errors: dict[str, str] = {}
     trade: dict[str, str] = {}
@@ -12,12 +15,11 @@ def validate_and_build_trade(form) -> tuple[dict, dict]:
     if not date_value:
         errors["date"] = "成交日期不能为空。"
     else:
-        if len(date_value) == 10 and date_value[4] == "-" and date_value[7] == "-":
-            date_value = date_value.replace("-", "")
-        elif len(date_value) == 8 and date_value.isdigit():
-            date_value = date_value
+        formatted_date = format_date_to_str(date_value)
+        if formatted_date:
+            date_value = formatted_date
         else:
-            errors["date"] = "日期格式应为YYYYMMDD。"
+            errors["date"] = "日期格式不正确。"
 
     if not code:
         errors["code"] = "代币代码不能为空。"
@@ -29,8 +31,7 @@ def validate_and_build_trade(form) -> tuple[dict, dict]:
         elif platform not in allowed_platforms:
             errors["platform"] = "平台不在允许范围内。"
 
-    valid_sides = ("买入", "卖出")
-    if side not in valid_sides:
+    if side not in VALID_CRYPTO_SIDES:
         errors["side"] = "请选择买卖标志。"
 
     price = None

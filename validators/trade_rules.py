@@ -1,3 +1,7 @@
+from utils.date_utils import format_date_to_str
+from utils.stock import normalize_stock_code
+from utils.constants import VALID_TRADE_SIDES, SIDE_DIVIDEND, SIDE_BUY, SIDE_SELL
+
 def validate_and_build_trade(form) -> tuple[dict, dict]:
     errors: dict[str, str] = {}
     trade: dict[str, str] = {}
@@ -14,25 +18,27 @@ def validate_and_build_trade(form) -> tuple[dict, dict]:
     if not date_value:
         errors["date"] = "成交日期不能为空。"
     else:
-        if len(date_value) == 10 and date_value[4] == "-" and date_value[7] == "-":
-            date_value = date_value.replace("-", "")
-        elif len(date_value) == 8 and date_value.isdigit():
-            date_value = date_value
+        formatted_date = format_date_to_str(date_value)
+        if formatted_date:
+            date_value = formatted_date
         else:
-            errors["date"] = "日期格式应为YYYYMMDD。"
+            errors["date"] = "日期格式不正确。"
 
     if not code:
         errors["code"] = "证券代码不能为空。"
     else:
-        if not (len(code) == 6 and code.isdigit()):
-            errors["code"] = "证券代码必须为6位数字。"
+        normalized_code = normalize_stock_code(code)
+        if not normalized_code:
+            errors["code"] = "证券代码格式不正确，请输入有效的6位数字代码（可带sh/sz前缀）。"
+        else:
+            # 统一存储为6位数字格式
+            code = normalized_code[2:]
 
-    valid_sides = ("证券买入", "证券卖出", "配售申购", "红股入账")
-    if side not in valid_sides:
+    if side not in VALID_TRADE_SIDES:
         errors["side"] = "请选择买卖标志。"
 
     price = None
-    if side == "红股入账":
+    if side == SIDE_DIVIDEND:
         price = 0.0
     else:
         if not price_raw:
@@ -57,7 +63,7 @@ def validate_and_build_trade(form) -> tuple[dict, dict]:
             errors["quantity"] = "成交数量必须为大于 0 的整数。"
 
     amount = None
-    if side == "红股入账":
+    if side == SIDE_DIVIDEND:
         amount = 0.0
     else:
         if amount_raw:
@@ -76,9 +82,9 @@ def validate_and_build_trade(form) -> tuple[dict, dict]:
 
     if not errors:
         signed_amount = amount
-        if side == "证券买入":
+        if side == SIDE_BUY:
             signed_amount = -abs(amount) if amount is not None else None
-        elif side == "证券卖出":
+        elif side == SIDE_SELL:
             signed_amount = abs(amount) if amount is not None else None
         trade = {
             "date": date_value,

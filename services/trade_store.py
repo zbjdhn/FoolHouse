@@ -1,162 +1,161 @@
-import csv
 import os
-import shutil
-from datetime import datetime
+import pymysql
 from typing import List, Tuple
-from services.paths import get_data_dir
+from services.db import get_db_connection, init_db
 
+# CSV 相关的常量保留，用于可能的迁移
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
-DATA_DIR = get_data_dir("data")
+DATA_DIR = os.path.join(ROOT_DIR, "data")
 DATA_FILE = os.path.join(DATA_DIR, "trades.csv")
 CSV_HEADERS = ["owner", "date", "code", "name", "side", "price", "quantity", "amount", "amount_auto"]
 
-
 def ensure_data_file() -> None:
-    os.makedirs(DATA_DIR, exist_ok=True)
-    # 迁移旧路径文件到新持久目录
-    old_file = os.path.join(ROOT_DIR, "data", "trades.csv")
-    if not os.path.exists(DATA_FILE) and os.path.exists(old_file):
-        try:
-            shutil.copy2(old_file, DATA_FILE)
-        except Exception:
-            pass
-    if not os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(CSV_HEADERS)
-    else:
-        with open(DATA_FILE, "r", newline="", encoding="utf-8") as f:
-            reader = csv.reader(f)
-            rows = list(reader)
-        if not rows:
-            with open(DATA_FILE, "w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                writer.writerow(CSV_HEADERS)
-        else:
-            header = rows[0]
-            if header != CSV_HEADERS:
-                with open(DATA_FILE, "r", newline="", encoding="utf-8") as f:
-                    dict_reader = csv.DictReader(f)
-                    existing = list(dict_reader)
-                with open(DATA_FILE, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
-                    writer.writeheader()
-                    for row in existing:
-                        new_row = {
-                            "owner": row.get("owner", ""),
-                            "date": row.get("date", ""),
-                            "code": row.get("code", ""),
-                            "name": row.get("name", ""),
-                            "side": row.get("side", ""),
-                            "price": row.get("price", ""),
-                            "quantity": row.get("quantity", ""),
-                            "amount": row.get("amount", ""),
-                            "amount_auto": row.get("amount_auto", "") or "0",
-                        }
-                        writer.writerow(new_row)
-    # 每日备份
+    """
+    确保数据库表已创建
+    """
     try:
-        backups_dir = get_data_dir("backups")
-        stamp = datetime.now().strftime("%Y%m%d")
-        backup_file = os.path.join(backups_dir, f"trades_{stamp}.csv")
-        if os.path.exists(DATA_FILE) and not os.path.exists(backup_file):
-            shutil.copy2(DATA_FILE, backup_file)
-    except Exception:
-        pass
-
+        init_db()
+    except Exception as e:
+        print(f"初始化数据库失败: {e}")
 
 def append_trade(trade: dict) -> None:
-    ensure_data_file()
-    with open(DATA_FILE, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
-        writer.writerow(trade)
-
+    """
+    将交易记录写入数据库
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            sql = """
+            INSERT INTO trades (owner, date, code, name, side, price, quantity, amount, amount_auto)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(sql, (
+                trade.get("owner"),
+                trade.get("date"),
+                trade.get("code"),
+                trade.get("name"),
+                trade.get("side"),
+                trade.get("price"),
+                trade.get("quantity"),
+                trade.get("amount"),
+                trade.get("amount_auto", "0") or "0"
+            ))
+        conn.commit()
+    finally:
+        conn.close()
 
 def load_trades(owner: str | None = None) -> List[dict]:
-    ensure_data_file()
-    with open(DATA_FILE, "r", newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        trades = list(reader)
-    if owner is not None:
-        trades = [t for t in trades if (t.get("owner") or "") == owner]
-    trades.sort(key=lambda t: t.get("date") or "", reverse=True)
-    return trades
-
+    """
+    从数据库加载交易记录
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            if owner:
+                cursor.execute("SELECT * FROM trades WHERE owner = %s ORDER BY date DESC, id DESC", (owner,))
+            else:
+                cursor.execute("SELECT * FROM trades ORDER BY date DESC, id DESC")
+            trades = cursor.fetchall()
+            
+            # 转换为与之前 CSV 读取一致的格式（主要是数值转字符串）
+            for t in trades:
+                t['price'] = str(t['price'])
+                t['quantity'] = str(t['quantity'])
+                t['amount'] = str(t['amount'])
+                # 保持 owner 为空字符串而不是 None，以兼容原有逻辑
+                if t['owner'] is None:
+                    t['owner'] = ""
+            return trades
+    finally:
+        conn.close()
 
 def load_all_trades_with_index() -> List[Tuple[int, dict]]:
-    ensure_data_file()
-    trades_with_index = []
-    with open(DATA_FILE, "r", newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for index, trade in enumerate(reader):
-            trades_with_index.append((index, trade))
-    return trades_with_index
+    """
+    获取所有交易记录及其数据库 ID
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM trades")
+            trades = cursor.fetchall()
+            result = []
+            for t in trades:
+                db_id = t.pop('id')
+                t['price'] = str(t['price'])
+                t['quantity'] = str(t['quantity'])
+                t['amount'] = str(t['amount'])
+                if t['owner'] is None:
+                    t['owner'] = ""
+                result.append((db_id, t))
+            return result
+    finally:
+        conn.close()
 
+def update_trade_by_index(db_id: int, updated_trade: dict) -> bool:
+    """
+    根据数据库 ID 更新交易记录
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            sql = """
+            UPDATE trades 
+            SET date=%s, code=%s, name=%s, side=%s, price=%s, quantity=%s, amount=%s, amount_auto=%s
+            WHERE id=%s
+            """
+            affected = cursor.execute(sql, (
+                updated_trade.get("date"),
+                updated_trade.get("code"),
+                updated_trade.get("name"),
+                updated_trade.get("side"),
+                updated_trade.get("price"),
+                updated_trade.get("quantity"),
+                updated_trade.get("amount"),
+                updated_trade.get("amount_auto", "0") or "0",
+                db_id
+            ))
+        conn.commit()
+        return affected > 0
+    finally:
+        conn.close()
 
-def update_trade_by_index(index: int, updated_trade: dict) -> bool:
-    ensure_data_file()
-    trades_with_index = load_all_trades_with_index()
-    if index < 0 or index >= len(trades_with_index):
-        return False
-    trades_with_index[index] = (index, updated_trade)
-    with open(DATA_FILE, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
-        writer.writeheader()
-        for _, trade in trades_with_index:
-            writer.writerow(trade)
-    return True
-
-
-def delete_trade_by_index(index: int) -> bool:
-    ensure_data_file()
-    trades_with_index = load_all_trades_with_index()
-    if index < 0 or index >= len(trades_with_index):
-        return False
-    trades_with_index.pop(index)
-    with open(DATA_FILE, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
-        writer.writeheader()
-        for _, trade in trades_with_index:
-            writer.writerow(trade)
-    return True
-
+def delete_trade_by_index(db_id: int) -> bool:
+    """
+    根据数据库 ID 删除交易记录
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            affected = cursor.execute("DELETE FROM trades WHERE id=%s", (db_id,))
+        conn.commit()
+        return affected > 0
+    finally:
+        conn.close()
 
 def clear_all_trades(owner: str | None = None) -> None:
-    ensure_data_file()
-    if owner is None:
-        with open(DATA_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(CSV_HEADERS)
-    else:
-        # Keep other users' records
-        with open(DATA_FILE, "r", newline="", encoding="utf-8") as f:
-            dict_reader = csv.DictReader(f)
-            rows = [r for r in dict_reader if (r.get("owner") or "") != owner]
-        with open(DATA_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
-            writer.writeheader()
-            for r in rows:
-                writer.writerow(r)
-
+    """
+    清除所有或特定用户的交易记录
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            if owner:
+                cursor.execute("DELETE FROM trades WHERE owner=%s", (owner,))
+            else:
+                cursor.execute("DELETE FROM trades")
+        conn.commit()
+    finally:
+        conn.close()
 
 def get_trade_by_display_index(display_index: int, owner: str | None = None) -> Tuple[int, dict] | tuple[None, None]:
+    """
+    根据显示列表中的索引获取交易记录及其对应的数据库 ID
+    """
     trades = load_trades(owner=owner)
     if display_index < 0 or display_index >= len(trades):
         return None, None
     target_trade = trades[display_index]
-    trades_with_index = load_all_trades_with_index()
-    for orig_index, trade in trades_with_index:
-        if (
-            ((trade.get("owner") or "") == (target_trade.get("owner") or "")) and
-            trade.get("date") == target_trade.get("date")
-            and trade.get("code") == target_trade.get("code")
-            and trade.get("name", "") == target_trade.get("name", "")
-            and trade.get("side") == target_trade.get("side")
-            and trade.get("price") == target_trade.get("price")
-            and trade.get("quantity") == target_trade.get("quantity")
-            and trade.get("amount") == target_trade.get("amount")
-            and (trade.get("amount_auto", "") or "0") == (target_trade.get("amount_auto", "") or "0")
-        ):
-            return orig_index, trade
-    return None, None
+    
+    # 因为 load_trades 已经返回了包含 id 的 dict，我们可以直接使用
+    db_id = target_trade.get('id')
+    return db_id, target_trade

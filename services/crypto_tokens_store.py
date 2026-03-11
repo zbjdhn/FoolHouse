@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime
 from typing import List, Dict
-from services.paths import get_data_dir
+from utils.paths import get_data_dir
 
 DATA_DIR = get_data_dir("data")
 TOKENS_FILE = os.path.join(DATA_DIR, "crypto_tokens.json")

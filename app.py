@@ -18,6 +18,7 @@ import services.analysis as analysis
 import services.snapshot_store as snapshot_store
 import services.crypto_tokens_store as crypto_tokens
 import services.i18n as i18n
+from utils.date_utils import format_date_to_str
 
 try:
     import pandas as pd
@@ -27,7 +28,7 @@ except ImportError:
 
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-from services.paths import get_data_dir
+from utils.paths import get_data_dir
 UPLOAD_DIR = (
     os.environ.get("FULLHOUSE_UPLOAD_DIR")
     or os.environ.get("FOOLHOUSE_UPLOAD_DIR")
@@ -44,11 +45,6 @@ def require_login():
     if not session.get("user"):
         return redirect(url_for("login", next=request.path))
     return None
-
-
-@app.before_request
-def _ensure_users():
-    user_store.ensure_users_file()
 
 
 @app.before_request
@@ -77,9 +73,10 @@ def login():
     if request.method == "POST":
         username = (request.form.get("username") or "").strip()
         password = (request.form.get("password") or "").strip()
-        if user_store.verify_password(username, password):
+        user = user_store.authenticate_user(username, password)
+        if user:
             session["user"] = username
-            session["is_admin"] = user_store.is_admin(username)
+            session["is_admin"] = bool(user.get("is_admin"))
             next_url = request.args.get("next") or url_for("list_trades")
             return redirect(next_url)
         else:
@@ -131,8 +128,6 @@ def index():
         if request.method == "POST":
             return redirect(url_for("login", next=request.path))
         return render_template("home.html", full_width=True)
-
-    trade_store.ensure_data_file()
 
     errors: dict[str, str] = {}
     form_data = {
@@ -194,7 +189,6 @@ def edit_trade(index: int):
     need = require_login()
     if need:
         return need
-    trade_store.ensure_data_file()
     
     orig_index, trade = trade_store.get_trade_by_display_index(index, owner=session.get("user"))
     
@@ -317,15 +311,7 @@ def export_trades():
         if "name" not in df.columns:
             df["name"] = ""
         if "date" in df.columns:
-            def _fmt(v):
-                s = str(v or "").strip()
-                if len(s) == 10 and s[4] == "-" and s[7] == "-":
-                    return s.replace("-", "")
-                elif len(s) == 8 and s.isdigit():
-                    return s
-                else:
-                    return s
-            df["date"] = df["date"].map(_fmt)
+            df["date"] = df["date"].map(lambda v: format_date_to_str(v))
         column_mapping = {
             "date": "成交日期",
             "code": "证券代码",
@@ -643,15 +629,7 @@ def crypto_export_trades():
         if "code" in df.columns:
             df["code"] = df["code"].map(lambda x: (str(x or "")).upper())
         if "date" in df.columns:
-            def _fmt(v):
-                s = str(v or "").strip()
-                if len(s) == 10 and s[4] == "-" and s[7] == "-":
-                    return s.replace("-", "")
-                elif len(s) == 8 and s.isdigit():
-                    return s
-                else:
-                    return s
-            df["date"] = df["date"].map(_fmt)
+            df["date"] = df["date"].map(lambda v: format_date_to_str(v))
         column_mapping = {
             "date": "成交日期",
             "code": "代币代码",
@@ -789,4 +767,5 @@ def admin_crypto_tokens():
     return render_template("admin_crypto_tokens.html", tokens=tokens, requests=requests, message=message)
 
 if __name__ == "__main__":
+    user_store.ensure_users_file()
     app.run(debug=True)

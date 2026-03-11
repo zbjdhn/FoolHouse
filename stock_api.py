@@ -1,233 +1,131 @@
 """
 股票数据 API 模块
-用于从外部接口获取股票信息，与主应用解耦
+使用 cachetools 实现专业级的 30 分钟缓存
+支持多源切换和重试
 """
 import re
-from typing import Optional, Dict
+import time
 import urllib.request
 import urllib.error
-from typing import List
+from typing import Optional, Dict, List
+from cachetools import TTLCache
+from utils.stock import normalize_stock_code
 
+# 专业缓存：TTL=30分钟 (1800s), 最大容量 1000 条
+# 同时保留一个"最近成功"的兜底存储，用于接口挂掉时显示过期数据
+_PRICE_CACHE = TTLCache(maxsize=1000, ttl=1800)
+_LAST_KNOWN_GOOD = {}
 
-def normalize_stock_code(code: str) -> Optional[str]:
-    """
-    标准化股票代码格式
-    
-    Args:
-        code: 用户输入的股票代码（如 "600900" 或 "sh600900"）
-    
-    Returns:
-        标准化后的代码（如 "sh600900" 或 "sz000001"），如果格式无效则返回 None
-    """
-    code = code.strip().upper()
-    
-    # 如果已经包含前缀，直接返回
-    if code.startswith(("SH", "SZ")):
-        return code.lower()
-    
-    # 判断是上海还是深圳
-    # 上海主板/科创板：600xxx, 601xxx, 603xxx, 605xxx, 688xxx
-    # 上海ETF常见：510xxx, 511xxx, 512xxx, 513xxx, 515xxx, 516xxx, 518xxx, 588xxx
-    # 深圳主板/创业板：000xxx, 001xxx, 002xxx, 003xxx, 300xxx
-    # 深圳ETF常见：159xxx
-    if re.match(r"^(600|601|603|605|688|510|511|512|513|515|516|518|588)\d{3}$", code):
-        return f"sh{code}"
-    elif re.match(r"^(000|001|002|003|300|159)\d{3}$", code):
-        return f"sz{code}"
-    
-    return None
-
-
-def fetch_stock_info(code: str, retry_count: int = 2) -> Dict[str, Optional[str]]:
-    """
-    从腾讯股票接口获取股票信息
-    
-    Args:
-        code: 标准化后的股票代码（如 "sh600900"）
-        retry_count: 重试次数（默认2次）
-    
-    Returns:
-        包含股票信息的字典：
-        {
-            "name": 股票名称（如 "长江电力"），
-            "current_price": 当前价格（如 "26.00"），
-            "error": 错误信息（如果有）
-        }
-    """
+def _fetch_from_tencent(code: str) -> Dict[str, Optional[str]]:
     url = f"https://qt.gtimg.cn/q={code}"
-    
-    # 创建请求，添加User-Agent头避免被拒绝
-    req = urllib.request.Request(url)
-    req.add_header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-    req.add_header("Referer", "https://finance.qq.com/")
-    
-    last_error = None
-    
-    # 重试机制
-    for attempt in range(retry_count + 1):
-        try:
-            with urllib.request.urlopen(req, timeout=10) as response:
-                data = response.read().decode("gbk")  # 接口返回 GBK 编码
-                
-                # 解析返回数据
-                # 格式：v_sh600900="1~股票名称~600900~当前价格~..."
-                match = re.search(r'v_[^=]+="([^"]+)"', data)
-                if not match:
-                    return {
-                        "name": None,
-                        "current_price": None,
-                        "error": "无法解析股票数据，请检查股票代码是否正确"
-                    }
-                
-                parts = match.group(1).split("~")
-                if len(parts) < 4:
-                    return {
-                        "name": None,
-                        "current_price": None,
-                        "error": "股票数据格式错误"
-                    }
-                
-                stock_name = parts[1] if parts[1] else None
-                current_price = parts[3] if parts[3] else None
-                
-                # 验证价格是否为有效数字
-                if current_price:
-                    try:
-                        float(current_price)
-                    except ValueError:
-                        current_price = None
-                
-                return {
-                    "name": stock_name,
-                    "current_price": current_price,
-                    "error": None
-                }
-                
-        except urllib.error.URLError as e:
-            last_error = e
-            # 如果是最后一次尝试，返回错误
-            if attempt == retry_count:
-                error_msg = str(e)
-                if "Connection reset" in error_msg or "54" in error_msg:
-                    return {
-                        "name": None,
-                        "current_price": None,
-                        "error": "网络连接被重置，可能是网络不稳定或接口限制，请稍后重试"
-                    }
-                elif "timeout" in error_msg.lower():
-                    return {
-                        "name": None,
-                        "current_price": None,
-                        "error": "请求超时，请检查网络连接后重试"
-                    }
-                else:
-                    return {
-                        "name": None,
-                        "current_price": None,
-                        "error": f"网络请求失败，请检查网络连接或稍后重试"
-                    }
-            # 否则等待一下再重试
-            import time
-            time.sleep(0.5)
-            
-        except Exception as e:
-            return {
-                "name": None,
-                "current_price": None,
-                "error": f"获取股票信息失败: {str(e)}"
-            }
-    
-    # 如果所有重试都失败
-    return {
-        "name": None,
-        "current_price": None,
-        "error": "网络请求失败，请检查网络连接或稍后重试"
-    }
-
-
-def get_stock_info(user_input_code: str) -> Dict[str, Optional[str]]:
-    """
-    根据用户输入的股票代码获取股票信息（对外统一接口）
-    
-    Args:
-        user_input_code: 用户输入的股票代码
-    
-    Returns:
-        包含股票信息的字典
-    """
-    normalized_code = normalize_stock_code(user_input_code)
-    if not normalized_code:
-        return {
-            "name": None,
-            "current_price": None,
-            "error": "股票代码格式不正确，请输入6位数字（如：600900）"
-        }
-    
-    return fetch_stock_info(normalized_code)
-
-
-def fetch_batch_stock_info(codes: List[str]) -> Dict[str, Dict[str, Optional[str]]]:
-    """
-    批量获取股票信息（按规范化代码，如 sh600000）
-    返回以规范化代码为键的字典
-    """
-    if not codes:
-        return {}
-    # 去重并保持顺序
-    seen = set()
-    norm_codes = []
-    for c in codes:
-        if c and c not in seen:
-            seen.add(c)
-            norm_codes.append(c)
-    url = "https://qt.gtimg.cn/q=" + ",".join(norm_codes)
     req = urllib.request.Request(url)
     req.add_header("User-Agent", "Mozilla/5.0")
     req.add_header("Referer", "https://finance.qq.com/")
+    with urllib.request.urlopen(req, timeout=5) as response:
+        data = response.read().decode("gbk")
+        match = re.search(r'v_[^=]+="([^"]+)"', data)
+        if not match: return {}
+        parts = match.group(1).split("~")
+        if len(parts) < 4: return {}
+        return {"name": parts[1], "current_price": parts[3]}
+
+def _fetch_from_sina(code: str) -> Dict[str, Optional[str]]:
+    url = f"https://hq.sinajs.cn/list={code}"
+    req = urllib.request.Request(url)
+    req.add_header("User-Agent", "Mozilla/5.0")
+    req.add_header("Referer", "https://finance.sina.com.cn/")
+    with urllib.request.urlopen(req, timeout=5) as response:
+        data = response.read().decode("gbk")
+        match = re.search(r'var hq_str_[^=]+="([^"]+)"', data)
+        if not match: return {}
+        parts = match.group(1).split(",")
+        if len(parts) < 4: return {}
+        return {"name": parts[0], "current_price": parts[3]}
+
+def fetch_stock_info(code: str, retry_count: int = 2) -> Dict[str, Optional[str]]:
+    # 1. 优先从 TTLCache 读取
+    if code in _PRICE_CACHE:
+        data = _PRICE_CACHE[code]
+        return {"name": data["name"], "current_price": data["price"], "error": None, "cached": True}
+
+    # 2. 缓存未命中或已过期，请求数据
+    sources = [_fetch_from_tencent, _fetch_from_sina]
+    last_error = "未知错误"
+    for attempt in range(retry_count + 1):
+        fetcher = sources[attempt % len(sources)]
+        try:
+            res = fetcher(code)
+            if res and res.get("name") and res.get("current_price"):
+                price = float(res["current_price"])
+                if price > 0:
+                    # 存入 TTLCache 和 兜底存储
+                    _PRICE_CACHE[code] = {"name": res["name"], "price": str(price)}
+                    _LAST_KNOWN_GOOD[code] = {"name": res["name"], "price": str(price)}
+                    return {"name": res["name"], "current_price": str(price), "error": None, "cached": False}
+        except Exception as e:
+            last_error = str(e)
+            time.sleep(0.3)
+
+    # 3. 如果所有尝试都失败，且 TTLCache 已过期，从兜底存储获取过期数据
+    if code in _LAST_KNOWN_GOOD:
+        data = _LAST_KNOWN_GOOD[code]
+        return {
+            "name": data["name"],
+            "current_price": data["price"],
+            "error": f"实时获取失败，显示过期数据: {last_error}",
+            "cached": True
+        }
+
+    return {"name": None, "current_price": None, "error": f"暂无法获取实时价格: {last_error}"}
+
+def get_stock_info(user_input_code: str) -> Dict[str, Optional[str]]:
+    nc = normalize_stock_code(user_input_code)
+    if not nc: return {"name": None, "current_price": None, "error": "无效的代码"}
+    return fetch_stock_info(nc)
+
+def fetch_batch_stock_info(codes: List[str]) -> Dict[str, Dict[str, Optional[str]]]:
+    if not codes: return {}
+    result = {}
+    missing = []
+    
+    # 从缓存提取
+    for c in codes:
+        if c in _PRICE_CACHE:
+            data = _PRICE_CACHE[c]
+            result[c] = {"name": data["name"], "current_price": data["price"]}
+        else:
+            missing.append(c)
+    
+    if not missing: return result
+    
+    # 批量请求
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        url = "https://qt.gtimg.cn/q=" + ",".join(missing)
+        req = urllib.request.Request(url)
+        req.add_header("User-Agent", "Mozilla/5.0")
+        with urllib.request.urlopen(req, timeout=8) as resp:
             data = resp.read().decode("gbk", errors="ignore")
-    except Exception:
-        return {}
-    result: Dict[str, Dict[str, Optional[str]]] = {}
-    # 每行一个 v_shXXXX="..."; 也可能多行合并，按分号拆
-    for segment in data.split(";"):
-        segment = segment.strip()
-        if not segment:
-            continue
-        m = re.search(r'v_([a-z]{2}\d{6})="([^"]*)"', segment)
-        if not m:
-            continue
-        norm = m.group(1)
-        parts = m.group(2).split("~")
-        name = parts[1] if len(parts) > 1 and parts[1] else None
-        price = parts[3] if len(parts) > 3 and parts[3] else None
-        # 校验数值
-        if price:
-            try:
-                float(price)
-            except ValueError:
-                price = None
-        result[norm] = {"name": name, "current_price": price}
+            for seg in data.split(";"):
+                m = re.search(r'v_([a-z]{2}\d{6})="([^"]*)"', seg.strip())
+                if not m: continue
+                nc, parts = m.group(1), m.group(2).split("~")
+                if len(parts) > 3:
+                    name, price = parts[1], parts[3]
+                    try:
+                        if float(price) > 0:
+                            item = {"name": name, "current_price": price}
+                            result[nc] = item
+                            _PRICE_CACHE[nc] = {"name": name, "price": price}
+                            _LAST_KNOWN_GOOD[nc] = {"name": name, "price": price}
+                    except: pass
+    except:
+        for c in missing:
+            info = fetch_stock_info(c, retry_count=1)
+            if info.get("name"): result[c] = info
+            
     return result
 
-
 def get_batch_stock_info(user_codes: List[str]) -> Dict[str, Dict[str, Optional[str]]]:
-    """
-    批量接口（按用户输入的6位代码列表） -> 返回以6位代码为键
-    """
-    mapping = {}
-    norm_list = []
-    for c in user_codes:
-        nc = normalize_stock_code(c)
-        if nc:
-            mapping[nc] = c  # 规范化 -> 原始6位
-            norm_list.append(nc)
-    data = fetch_batch_stock_info(norm_list)
-    out: Dict[str, Dict[str, Optional[str]]] = {}
-    for nc, info in data.items():
-        six = mapping.get(nc)
-        if not six:
-            continue
-        out[six] = {"name": info.get("name"), "current_price": info.get("current_price")}
-    return out
+    mapping = {normalize_stock_code(c): c for c in user_codes if normalize_stock_code(c)}
+    data = fetch_batch_stock_info(list(mapping.keys()))
+    return {mapping[nc]: info for nc, info in data.items() if nc in mapping}

@@ -3,7 +3,7 @@ import os
 import shutil
 from datetime import datetime
 from typing import List, Tuple
-from services.paths import get_data_dir
+from utils.paths import get_data_dir
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 

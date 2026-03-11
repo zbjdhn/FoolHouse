@@ -1,4 +1,6 @@
 from datetime import date, datetime
+from utils.date_utils import format_date_to_str
+from utils.constants import CRYPTO_SIDE_MAPPING
 
 try:
     import pandas as pd
@@ -51,30 +53,10 @@ def parse_excel_file(file_path):
                 if pd.isna(date_val):
                     row_errors.append(f"第{row_num}行：成交日期为空")
                 else:
-                    if isinstance(date_val, datetime):
-                        date_val = date_val.strftime("%Y%m%d")
-                    elif isinstance(date_val, date):
-                        date_val = date_val.strftime("%Y%m%d")
-                    else:
-                        try:
-                            if isinstance(date_val, (int, float)) and not isinstance(date_val, bool):
-                                iv = int(date_val)
-                                s = str(iv)
-                                if len(s) == 8 and s.isdigit():
-                                    date_val = s
-                                else:
-                                    date_val = pd.to_datetime(date_val).strftime("%Y%m%d")
-                            else:
-                                s = str(date_val).strip()
-                                digits = "".join(ch for ch in s if ch.isdigit())
-                                if len(digits) == 8:
-                                    date_val = digits
-                                else:
-                                    date_val = pd.to_datetime(s).strftime("%Y%m%d")
-                        except Exception:
-                            row_errors.append(f"第{row_num}行：成交日期格式不正确")
-                            date_val = None
-                trade_dict["date"] = date_val
+                    date_str = format_date_to_str(date_val)
+                    if not date_str:
+                        row_errors.append(f"第{row_num}行：成交日期格式不正确")
+                    trade_dict["date"] = date_str
 
                 code_val = row[column_map["code"]]
                 if pd.isna(code_val):
@@ -91,12 +73,8 @@ def parse_excel_file(file_path):
                     row_errors.append(f"第{row_num}行：买卖标志为空")
                 else:
                     side_str = str(side_val).strip()
-                    side_mapping = {
-                        "买入": ["买入", "BUY", "buy", "Buy", "B", "b", "入"],
-                        "卖出": ["卖出", "SELL", "sell", "Sell", "S", "s", "出"],
-                    }
                     matched = False
-                    for standard_side, variants in side_mapping.items():
+                    for standard_side, variants in CRYPTO_SIDE_MAPPING.items():
                         if side_str == standard_side or side_str in variants:
                             trade_dict["side"] = standard_side
                             matched = True

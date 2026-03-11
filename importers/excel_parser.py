@@ -1,4 +1,7 @@
 from datetime import date, datetime
+from utils.date_utils import format_date_to_str
+from utils.stock import format_to_6_digits, is_valid_stock_code
+from utils.constants import SIDE_MAPPING, SIDE_DIVIDEND
 
 try:
     import pandas as pd
@@ -49,43 +52,20 @@ def parse_excel_file(file_path):
                 if pd.isna(date_val):
                     row_errors.append(f"第{row_num}行：成交日期为空")
                 else:
-                    if isinstance(date_val, datetime):
-                        date_val = date_val.strftime("%Y%m%d")
-                    elif isinstance(date_val, date):
-                        date_val = date_val.strftime("%Y%m%d")
-                    else:
-                        try:
-                            if isinstance(date_val, (int, float)) and not isinstance(date_val, bool):
-                                iv = int(date_val)
-                                s = str(iv)
-                                if len(s) == 8 and s.isdigit():
-                                    date_val = s
-                                else:
-                                    date_val = pd.to_datetime(date_val).strftime("%Y%m%d")
-                            else:
-                                s = str(date_val).strip()
-                                digits = "".join(ch for ch in s if ch.isdigit())
-                                if len(digits) == 8:
-                                    date_val = digits
-                                else:
-                                    date_val = pd.to_datetime(s).strftime("%Y%m%d")
-                        except:
-                            row_errors.append(f"第{row_num}行：成交日期格式不正确")
-                            date_val = None
-                    trade_dict["date"] = date_val
+                    date_str = format_date_to_str(date_val)
+                    if not date_str:
+                        row_errors.append(f"第{row_num}行：成交日期格式不正确")
+                    trade_dict["date"] = date_str
 
                 code_val = row[column_map["code"]]
                 if pd.isna(code_val):
                     row_errors.append(f"第{row_num}行：证券代码为空")
                 else:
-                    code_str = str(code_val).strip()
-                    digits = "".join(ch for ch in code_str if ch.isdigit())
-                    if len(digits) < 6:
-                        digits = digits.zfill(6)
-                    if len(digits) != 6:
+                    formatted_code = format_to_6_digits(code_val)
+                    if not is_valid_stock_code(formatted_code):
                         row_errors.append(f"第{row_num}行：证券代码必须为6位数字")
                     else:
-                        trade_dict["code"] = digits
+                        trade_dict["code"] = formatted_code
                 name_col = find_column_index(df, ["证券名称", "名称", "证券简称", "股票名称", "name", "Name", "NAME"])
                 if name_col:
                     name_val = row[name_col]
@@ -101,14 +81,8 @@ def parse_excel_file(file_path):
                     row_errors.append(f"第{row_num}行：买卖标志为空")
                 else:
                     side_str = str(side_val).strip()
-                    side_mapping = {
-                        "证券买入": ["证券买入", "买入", "买", "BUY", "buy", "Buy", "B", "b", "证券买"],
-                        "证券卖出": ["证券卖出", "卖出", "卖", "SELL", "sell", "Sell", "S", "s", "证券卖"],
-                        "配售申购": ["配售申购", "配售", "申购", "配股"],
-                        "红股入账": ["红股入账", "红股", "送股", "分红"],
-                    }
                     matched = False
-                    for standard_side, variants in side_mapping.items():
+                    for standard_side, variants in SIDE_MAPPING.items():
                         if side_str in variants or side_str == standard_side:
                             trade_dict["side"] = standard_side
                             matched = True
@@ -118,7 +92,7 @@ def parse_excel_file(file_path):
                         trade_dict["side"] = side_str
 
                 price_val = row[column_map["price"]]
-                if trade_dict.get("side") == "红股入账":
+                if trade_dict.get("side") == SIDE_DIVIDEND:
                     if pd.isna(price_val) or str(price_val).strip() == "":
                         row_errors.append(f"第{row_num}行：红股入账的成交价格必须为0")
                     else:
@@ -151,7 +125,7 @@ def parse_excel_file(file_path):
                         row_errors.append(f"第{row_num}行：成交数量格式不正确")
 
                 amount_val = row[column_map["amount"]]
-                if trade_dict.get("side") == "红股入账":
+                if trade_dict.get("side") == SIDE_DIVIDEND:
                     if pd.isna(amount_val) or str(amount_val).strip() == "":
                         row_errors.append(f"第{row_num}行：红股入账的发生金额必须为0")
                     else:

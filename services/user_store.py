@@ -1,140 +1,191 @@
-import json
-import os
-import shutil
 import hashlib
-import tempfile
+import pymysql
 import threading
-from datetime import datetime
 from typing import List, Dict, Optional
-from services.paths import get_data_dir
+from services.db import get_db_connection, init_db
+from utils.security import hash_password
 
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
-DATA_DIR = get_data_dir("data")
-USERS_FILE = os.path.join(DATA_DIR, "users.json")
-_LOCK = threading.RLock()
-
-
-def _hash(password: str) -> str:
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
-
+# 用户信息内存缓存
+_USER_CACHE = {}
+_CACHE_LOCK = threading.RLock()
 
 def ensure_users_file() -> None:
-    os.makedirs(DATA_DIR, exist_ok=True)
-    # 迁移旧文件
-    old_file = os.path.join(ROOT_DIR, "data", "users.json")
-    if not os.path.exists(USERS_FILE) and os.path.exists(old_file):
-        try:
-            shutil.copy2(old_file, USERS_FILE)
-        except Exception:
-            pass
-    if not os.path.exists(USERS_FILE):
-        users = [
-            {"username": "admin", "password_hash": _hash("001123"), "is_admin": True},
-            {"username": "ada", "password_hash": _hash("001123"), "is_admin": False},
-        ]
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(users, f, ensure_ascii=False, indent=2)
-    # 每日备份
+    """
+    确保数据库表已创建，并进行初始用户数据迁移，同时预加载缓存
+    """
+    init_db()
+    # 检查是否需要迁移
+    conn = get_db_connection()
     try:
-        backups_dir = get_data_dir("backups")
-        stamp = datetime.now().strftime("%Y%m%d")
-        backup_file = os.path.join(backups_dir, f"users_{stamp}.json")
-        if os.path.exists(USERS_FILE) and not os.path.exists(backup_file):
-            shutil.copy2(USERS_FILE, backup_file)
-    except Exception:
-        pass
-
-
-def _load_users() -> List[Dict]:
-    ensure_users_file()
-    with open(USERS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _save_users(users: List[Dict]) -> None:
-    ensure_users_file()
-    fd, temp_path = tempfile.mkstemp(prefix="users_", suffix=".json.tmp", dir=DATA_DIR)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(users, f, ensure_ascii=False, indent=2)
-        os.replace(temp_path, USERS_FILE)
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) as count FROM users")
+            count = cursor.fetchone()['count']
+            if count == 0:
+                # 初始用户
+                users = [
+                    ("admin", hash_password("001123"), True),
+                    ("ada", hash_password("001123"), False),
+                ]
+                cursor.executemany(
+                    "INSERT INTO users (username, password_hash, is_admin) VALUES (%s, %s, %s)",
+                    users
+                )
+                conn.commit()
+            
+            # 预加载所有用户信息到缓存
+            cursor.execute("SELECT * FROM users")
+            all_users = cursor.fetchall()
+            with _CACHE_LOCK:
+                _USER_CACHE.clear()
+                for u in all_users:
+                    _USER_CACHE[u['username']] = u
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
+        conn.close()
 
 def get_user(username: str) -> Optional[Dict]:
-    for u in _load_users():
-        if u.get("username") == username:
-            return u
-    return None
+    """
+    优先从内存缓存中获取用户信息，实现极速响应
+    """
+    with _CACHE_LOCK:
+        if username in _USER_CACHE:
+            return _USER_CACHE[username]
+    
+    # 缓存未命中（虽然 ensure_users_file 会预加载，但为了健壮性保留 DB 查询）
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+            user = cursor.fetchone()
+            if user:
+                with _CACHE_LOCK:
+                    _USER_CACHE[username] = user
+            return user
+    finally:
+        conn.close()
 
+def authenticate_user(username: str, password: str) -> Optional[Dict]:
+    """
+    极速验证：完全基于内存缓存进行匹配，无需数据库连接
+    """
+    u = get_user(username)
+    if u and u.get("password_hash") == hash_password(password):
+        return u
+    return None
 
 def verify_password(username: str, password: str) -> bool:
     u = get_user(username)
     if not u:
         return False
-    return u.get("password_hash") == _hash(password)
-
+    return u.get("password_hash") == hash_password(password)
 
 def is_admin(username: str) -> bool:
     u = get_user(username)
     return bool(u and u.get("is_admin"))
-
 
 def create_user(username: str, password: str, is_admin_flag: bool = False) -> tuple[bool, str]:
     username = (username or "").strip()
     password = (password or "").strip()
     if not username or not password:
         return False, "用户名和密码不能为空"
-    with _LOCK:
-        users = _load_users()
-        for u in users:
-            exist_name = (u.get("username") or "").strip()
-            if exist_name.lower() == username.lower():
+    
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 检查用户是否存在
+            cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+            if cursor.fetchone():
                 return False, "用户已存在"
-        users.append({"username": username, "password_hash": _hash(password), "is_admin": is_admin_flag})
-        try:
-            _save_users(users)
+            
+            cursor.execute(
+                "INSERT INTO users (username, password_hash, is_admin) VALUES (%s, %s, %s)",
+                (username, hash_password(password), is_admin_flag)
+            )
+            conn.commit()
+            
+            # 更新缓存
+            cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+            new_user = cursor.fetchone()
+            if new_user:
+                with _CACHE_LOCK:
+                    _USER_CACHE[username] = new_user
+            
             return True, "用户创建成功"
-        except OSError:
-            return False, "用户创建失败：数据目录无写权限"
-
+    except Exception as e:
+        return False, f"用户创建失败：{str(e)}"
+    finally:
+        conn.close()
 
 def list_users() -> List[Dict]:
-    return _load_users()
-
+    """
+    优先返回缓存中的用户列表
+    """
+    with _CACHE_LOCK:
+        if _USER_CACHE:
+            return list(_USER_CACHE.values())
+    
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM users")
+            users = cursor.fetchall()
+            # 顺便更新缓存
+            with _CACHE_LOCK:
+                _USER_CACHE.clear()
+                for u in users:
+                    _USER_CACHE[u['username']] = u
+            return users
+    finally:
+        conn.close()
 
 def delete_user(username: str) -> tuple[bool, str]:
-    users = _load_users()
-    target = None
-    for u in users:
-        if u.get("username") == username:
-            target = u
-            break
-    if not target:
-        return False, "用户不存在"
-    if target.get("is_admin"):
-        admin_count = sum(1 for u in users if u.get("is_admin"))
-        if admin_count <= 1:
-            return False, "至少保留一个管理员"
-    users = [u for u in users if u.get("username") != username]
-    _save_users(users)
-    return True, "用户已删除"
-
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT is_admin FROM users WHERE username = %s", (username,))
+            user = cursor.fetchone()
+            if not user:
+                return False, "用户不存在"
+            
+            if user['is_admin']:
+                cursor.execute("SELECT COUNT(*) as count FROM users WHERE is_admin = TRUE")
+                admin_count = cursor.fetchone()['count']
+                if admin_count <= 1:
+                    return False, "至少保留一个管理员"
+            
+            cursor.execute("DELETE FROM users WHERE username = %s", (username,))
+            conn.commit()
+            
+            # 清理缓存
+            with _CACHE_LOCK:
+                _USER_CACHE.pop(username, None)
+                
+            return True, "用户已删除"
+    finally:
+        conn.close()
 
 def update_password(username: str, new_password: str) -> tuple[bool, str]:
     if not new_password:
         return False, "密码不能为空"
-    users = _load_users()
-    updated = False
-    for u in users:
-        if u.get("username") == username:
-            u["password_hash"] = _hash(new_password)
-            updated = True
-            break
-    if not updated:
-        return False, "用户不存在"
-    _save_users(users)
-    return True, "密码已更新"
+    
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+            if not cursor.fetchone():
+                return False, "用户不存在"
+            
+            new_hash = hash_password(new_password)
+            cursor.execute(
+                "UPDATE users SET password_hash = %s WHERE username = %s",
+                (new_hash, username)
+            )
+            conn.commit()
+            
+            # 更新缓存中的密码哈希
+            with _CACHE_LOCK:
+                if username in _USER_CACHE:
+                    _USER_CACHE[username]['password_hash'] = new_hash
+            
+            return True, "密码已更新"
+    finally:
+        conn.close()
