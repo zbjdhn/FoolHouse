@@ -4,30 +4,83 @@
 <div class="fh-home">
   <section class="fh-hero">
     <div class="fh-grid-bg"></div>
-    <div class="fh-orb fh-orb-a"></div>
-    <div class="fh-orb fh-orb-b"></div>
+    <div class="fh-hero-glow fh-hero-glow-a"></div>
+    <div class="fh-hero-glow fh-hero-glow-b"></div>
     <div class="container-fluid px-4 px-md-5 py-5 position-relative">
       <div class="row align-items-center g-4">
-        <div class="col-lg-7">
+        <div class="col-lg-6">
           <div class="fh-hero-logo fh-reveal">
             <img src="{{ url_for('static', filename='fullhouse-logo-lockup.svg') }}" alt="FullHouse logo" />
           </div>
-          <span class="fh-badge fh-reveal">{{ t('home_badge') }}</span>
-          <h1 class="fh-title mt-3 fh-reveal" style="--d: 0.08s;">{{ t('home_title') }}</h1>
-          <p class="fh-subtitle mt-3 fh-reveal" style="--d: 0.15s;">
+          <span class="fh-kicker fh-reveal">{{ t('home_badge') }}</span>
+          <h1 class="fh-hero-title mt-3 fh-reveal" style="--d: 0.08s;">{{ t('home_title') }}</h1>
+          <p class="fh-hero-subtitle mt-3 fh-reveal" style="--d: 0.15s;">
             {{ t('home_subtitle') }}
           </p>
           <div class="d-flex gap-3 mt-4 flex-wrap fh-reveal" style="--d: 0.22s;">
             <a class="btn btn-primary btn-lg px-5 fh-btn-primary fh-btn-login" href="{{ url_for('login') }}">{{ t('home_login_now') }}</a>
           </div>
+          <div class="fh-signal-grid mt-4 fh-reveal" style="--d: 0.28s;">
+            <div class="fh-signal-card">
+              <span>{{ t('home_asset_scope') }}</span>
+              <strong>{{ t('home_asset_scope_value') }}</strong>
+            </div>
+            <div class="fh-signal-card">
+              <span>{{ t('home_input_mode') }}</span>
+              <strong>{{ t('home_input_mode_value') }}</strong>
+            </div>
+            <div class="fh-signal-card">
+              <span>{{ t('home_analysis') }}</span>
+              <strong>{{ t('home_analysis_value') }}</strong>
+            </div>
+            <div class="fh-signal-card">
+              <span>{{ t('home_access') }}</span>
+              <strong>{{ t('home_access_value') }}</strong>
+            </div>
+          </div>
         </div>
-        <div class="col-lg-5">
-          <div class="fh-panel fh-reveal" style="--d: 0.28s;">
-            <h5 class="mb-3">{{ t('home_snapshot_title') }}</h5>
-            <div class="fh-metric-row"><span>{{ t('home_asset_scope') }}</span><strong>{{ t('home_asset_scope_value') }}</strong></div>
-            <div class="fh-metric-row"><span>{{ t('home_input_mode') }}</span><strong>{{ t('home_input_mode_value') }}</strong></div>
-            <div class="fh-metric-row"><span>{{ t('home_analysis') }}</span><strong>{{ t('home_analysis_value') }}</strong></div>
-            <div class="fh-metric-row"><span>{{ t('home_access') }}</span><strong>{{ t('home_access_value') }}</strong></div>
+        <div class="col-lg-6">
+          <div class="fh-data-board fh-reveal" style="--d: 0.3s;">
+            <div class="fh-board-header">
+              <div>
+                <span class="fh-board-kicker">{{ t('home_snapshot_title') }}</span>
+                <h5 class="fh-board-title">{{ t('home_board_title') }}</h5>
+              </div>
+              <span class="fh-board-pill">{{ t('home_board_status') }}</span>
+            </div>
+            <div class="fh-board-chart">
+              <svg viewBox="0 0 360 160" role="img" aria-label="Signal chart">
+                <defs>
+                  <linearGradient id="fhChartLine" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="var(--fh-accent)" />
+                    <stop offset="100%" stop-color="var(--fh-accent-2)" />
+                  </linearGradient>
+                </defs>
+                <path d="M12 130 L72 96 L128 112 L186 68 L242 88 L300 44 L348 60" fill="none" stroke="url(#fhChartLine)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M12 130 L72 96 L128 112 L186 68 L242 88 L300 44 L348 60 L348 150 L12 150 Z" fill="url(#fhChartLine)" opacity="0.16"/>
+                <g fill="var(--fh-accent)">
+                  <circle cx="12" cy="130" r="4"/><circle cx="72" cy="96" r="4"/><circle cx="128" cy="112" r="4"/><circle cx="186" cy="68" r="4"/><circle cx="242" cy="88" r="4"/><circle cx="300" cy="44" r="4"/><circle cx="348" cy="60" r="4"/>
+                </g>
+              </svg>
+            </div>
+            <div class="fh-board-metrics">
+              <div class="fh-board-metric">
+                <span>{{ t('home_metric_1_label') }}</span>
+                <strong>{{ t('home_metric_1_value') }}</strong>
+              </div>
+              <div class="fh-board-metric">
+                <span>{{ t('home_metric_2_label') }}</span>
+                <strong>{{ t('home_metric_2_value') }}</strong>
+              </div>
+              <div class="fh-board-metric">
+                <span>{{ t('home_metric_3_label') }}</span>
+                <strong>{{ t('home_metric_3_value') }}</strong>
+              </div>
+              <div class="fh-board-metric">
+                <span>{{ t('home_metric_4_label') }}</span>
+                <strong>{{ t('home_metric_4_value') }}</strong>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -35,7 +88,10 @@
   </section>
 
   <section class="container-fluid px-4 px-md-5 py-5">
-    <h2 class="fh-section-title mb-4 fh-on-scroll">{{ t('home_features_title') }}</h2>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+      <h2 class="fh-section-title mb-0 fh-on-scroll">{{ t('home_features_title') }}</h2>
+      <span class="fh-section-note fh-on-scroll">{{ t('home_features_note') }}</span>
+    </div>
     <div class="row g-4">
       <div class="col-md-6 col-xl-3">
         <article class="fh-feature-card fh-on-scroll">

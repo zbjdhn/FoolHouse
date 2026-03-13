@@ -48,7 +48,7 @@
           <ul class="navbar-nav ms-auto align-items-center">
             {% if session.get('user') %}
               <li class="nav-item dropdown me-2">
-                <a class="nav-link dropdown-toggle lang-dropdown-btn py-1 px-2 small-nav-btn" href="#" id="langDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <a class="nav-link dropdown-toggle nav-control-btn nav-embed" href="#" id="langDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-translate me-1" viewBox="0 0 16 16">
                     <path d="M4.545 6.714 4.11 8H3l1.862-5h1.284L8 8H6.833l-.435-1.286zm1.634-.736L5.5 3.956h-.049l-.679 2.022z"/>
                     <path d="M0 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zm7.138 9.995q.289.451.63.846c-.197.154-.467.264-.767.339h-.133a1 1 0 0 0-.113.013L8 11.239V10h1zm.613-1.583q-.278-.446-.52-.858H7.031L5.641 8H4.11l.505 1.5H5.7l.333-1h1.232l.333 1z"/>
@@ -60,8 +60,22 @@
                   <li><a class="dropdown-item py-1 px-3 small{% if lang == 'en' %} active{% endif %}" href="{{ url_for('switch_lang', lang='en', next=request.full_path) }}">{{ t('nav_lang_en') }}</a></li>
                 </ul>
               </li>
+              <li class="nav-item me-2">
+                <button class="nav-control-btn nav-control-btn--icon nav-embed" type="button" aria-label="Toggle theme" data-theme-toggle>
+                  <span class="theme-toggle-icon theme-toggle-sun" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M8 1.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 8 1.75zm0 12.5a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75zm6.25-6a.75.75 0 0 1-.75.75v.5a.75.75 0 0 1-1.5 0v-.5a.75.75 0 0 1 1.5 0v-.5a.75.75 0 0 1 .75-.75zm-12.5 0a.75.75 0 0 1-.75.75v.5a.75.75 0 0 1-1.5 0v-.5A.75.75 0 0 1 1.75 7.5zm8.96-4.71a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zm-8.48 8.48a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zm8.48 1.42a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zm-8.48-8.48a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zM8 4.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z"/>
+                    </svg>
+                  </span>
+                  <span class="theme-toggle-icon theme-toggle-moon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M11.286 1.011a.75.75 0 0 1 .61 1.24 5.5 5.5 0 1 0 2.353 7.496.75.75 0 1 1 1.32.71A7 7 0 1 1 10.045.33a.75.75 0 0 1 1.241.681z"/>
+                    </svg>
+                  </span>
+                </button>
+              </li>
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle nav-profile-btn py-1 px-3" href="#" id="profileDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <a class="nav-link dropdown-toggle nav-profile-btn nav-embed py-1 px-3" href="#" id="profileDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                   <div class="d-inline-flex align-items-center">
                     <div class="profile-avatar-sm me-2">
                       {{ session.get('user')[0].upper() }}
@@ -110,7 +124,7 @@
               </li>
             {% else %}
               <li class="nav-item dropdown me-2">
-                <a class="nav-link dropdown-toggle lang-dropdown-btn py-1 px-2 small-nav-btn" href="#" id="guestLangDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <a class="nav-link dropdown-toggle nav-control-btn nav-embed" href="#" id="guestLangDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-translate me-1" viewBox="0 0 16 16">
                     <path d="M4.545 6.714 4.11 8H3l1.862-5h1.284L8 8H6.833l-.435-1.286zm1.634-.736L5.5 3.956h-.049l-.679 2.022z"/>
                     <path d="M0 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zm7.138 9.995q.289.451.63.846c-.197.154-.467.264-.767.339h-.133a1 1 0 0 0-.113.013L8 11.239V10h1zm.613-1.583q-.278-.446-.52-.858H7.031L5.641 8H4.11l.505 1.5H5.7l.333-1h1.232l.333 1z"/>
@@ -121,6 +135,20 @@
                   <li><a class="dropdown-item py-1 px-3 small{% if lang == 'zh' %} active{% endif %}" href="{{ url_for('switch_lang', lang='zh', next=request.full_path) }}">{{ t('nav_lang_zh') }}</a></li>
                   <li><a class="dropdown-item py-1 px-3 small{% if lang == 'en' %} active{% endif %}" href="{{ url_for('switch_lang', lang='en', next=request.full_path) }}">{{ t('nav_lang_en') }}</a></li>
                 </ul>
+              </li>
+              <li class="nav-item me-2">
+                <button class="nav-control-btn nav-control-btn--icon nav-embed" type="button" aria-label="Toggle theme" data-theme-toggle>
+                  <span class="theme-toggle-icon theme-toggle-sun" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M8 1.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 8 1.75zm0 12.5a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75zm6.25-6a.75.75 0 0 1-.75.75v.5a.75.75 0 0 1-1.5 0v-.5a.75.75 0 0 1 1.5 0v-.5a.75.75 0 0 1 .75-.75zm-12.5 0a.75.75 0 0 1-.75.75v.5a.75.75 0 0 1-1.5 0v-.5A.75.75 0 0 1 1.75 7.5zm8.96-4.71a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zm-8.48 8.48a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zm8.48 1.42a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zm-8.48-8.48a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zM8 4.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z"/>
+                    </svg>
+                  </span>
+                  <span class="theme-toggle-icon theme-toggle-moon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M11.286 1.011a.75.75 0 0 1 .61 1.24 5.5 5.5 0 1 0 2.353 7.496.75.75 0 1 1 1.32.71A7 7 0 1 1 10.045.33a.75.75 0 0 1 1.241.681z"/>
+                    </svg>
+                  </span>
+                </button>
               </li>
               <li class="nav-item">
                 <a class="nav-link nav-login-btn py-1 px-3" href="{{ url_for('login') }}">{{ t('nav_login') }}</a>
@@ -184,5 +212,69 @@
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
+    <script>
+      (function() {
+        var storageKey = "fh-theme";
+        var root = document.body;
+        var nav = document.querySelector(".navbar");
+        var toggles = document.querySelectorAll("[data-theme-toggle]");
+        var mediaQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+        function setNavTheme(theme) {
+          if (!nav) {
+            return;
+          }
+          nav.classList.toggle("navbar-dark", theme === "dark");
+          nav.classList.toggle("bg-dark", theme === "dark");
+          nav.classList.toggle("navbar-light", theme === "light");
+          nav.classList.toggle("bg-light", theme === "light");
+        }
+
+        function applyTheme(theme) {
+          root.setAttribute("data-theme", theme);
+          setNavTheme(theme);
+          toggles.forEach(function(btn) {
+            btn.setAttribute("aria-pressed", theme === "dark" ? "true" : "false");
+            btn.setAttribute("title", theme === "dark" ? "切换到浅色" : "切换到深色");
+          });
+        }
+
+        function getStoredTheme() {
+          try {
+            return localStorage.getItem(storageKey);
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function setStoredTheme(theme) {
+          try {
+            localStorage.setItem(storageKey, theme);
+          } catch (e) {
+            return;
+          }
+        }
+
+        var stored = getStoredTheme();
+        var initial = stored || (mediaQuery && mediaQuery.matches ? "dark" : "light");
+        applyTheme(initial);
+
+        toggles.forEach(function(btn) {
+          btn.addEventListener("click", function() {
+            var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+            setStoredTheme(next);
+            applyTheme(next);
+          });
+        });
+
+        if (!stored && mediaQuery) {
+          mediaQuery.addEventListener("change", function(event) {
+            if (!getStoredTheme()) {
+              applyTheme(event.matches ? "dark" : "light");
+            }
+          });
+        }
+      })();
+    </script>
   </body>
   </html>
