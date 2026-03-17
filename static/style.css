@@ -770,6 +770,33 @@ main.container {
   color: rgba(255, 255, 255, 0.85) !important;
 }
 
+/* 圆形图标按钮（如语言地球、明暗切换），参照你给的地球效果 */
+.navbar .nav-icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9) !important;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+.navbar .nav-icon-only svg {
+  width: 18px;
+  height: 18px;
+}
+
+.navbar .nav-icon-only:hover,
+.navbar .nav-icon-only:focus {
+  background: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
 .nav-control-btn {
   gap: 0.45rem;
   padding: 0.35rem 0.65rem;
@@ -781,7 +808,7 @@ main.container {
   line-height: 1;
   cursor: pointer;
   transition: all 0.2s ease;
-  border-color: transparent;
+  border: none;
 }
 
 .nav-embed {
@@ -789,6 +816,7 @@ main.container {
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.12),
     inset 0 -1px 2px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(10px); /* 轻微磨砂玻璃效果，更有科技感 */
 }
 
 .nav-embed:hover,
@@ -797,12 +825,6 @@ main.container {
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.2),
     inset 0 -1px 2px rgba(0, 0, 0, 0.32);
-}
-
-.nav-control-btn--icon {
-  width: 36px;
-  height: 36px;
-  padding: 0;
 }
 
 .nav-control-btn:hover,
@@ -966,6 +988,16 @@ body[data-theme="light"] .theme-toggle-moon {
   border-color: transparent;
   background: rgba(15, 23, 42, 0.04);
   color: #0f172a !important;
+}
+
+.navbar-light .nav-icon-only {
+  background: rgba(15, 23, 42, 0.05);
+  color: #0f172a !important;
+}
+
+.navbar-light .nav-icon-only:hover,
+.navbar-light .nav-icon-only:focus {
+  background: rgba(15, 23, 42, 0.12);
 }
 
 .navbar-light .nav-embed {

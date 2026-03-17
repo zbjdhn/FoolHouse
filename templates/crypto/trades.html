@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% set fh_page = "crypto_list" %}
 {% block content %}
   <div class="row">
     <div class="col-12">
@@ -19,23 +20,12 @@
           </div>
         </div>
         <div class="card-body">
-          {% if trades %}
-            <div class="mb-3 d-flex align-items-center gap-2">
-              <input type="text" class="form-control" id="search-input" placeholder="搜索代币代码..." autocomplete="off" style="max-width: 420px;" />
-              <button type="button" class="btn btn-outline-secondary btn-sm" id="clear-search" style="display: none;">
-                清除搜索
-              </button>
-              <span id="search-result-count" class="text-muted ms-2"></span>
-            </div>
+          <div data-fh-table-state>
             <div class="table-responsive">
               <table class="table table-striped table-hover align-middle" id="trades-table">
                 <thead>
                   <tr>
-                    <th>
-                      成交日期
-                      <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" id="sort-date-asc" title="时间顺序">↑</button>
-                      <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" id="sort-date-desc" title="时间倒序">↓</button>
-                    </th>
+                    <th>成交日期</th>
                     <th>代币代码</th>
                     <th>平台</th>
                     <th>买卖标志</th>
@@ -44,103 +34,16 @@
                     <th class="text-center">操作</th>
                   </tr>
                 </thead>
-                <tbody id="trades-tbody">
-                  {% for trade in trades %}
-                    <tr data-code="{{ trade.code }}" data-index="{{ loop.index0 }}">
-                      <td>{{ trade.date }}</td>
-                      <td>{{ trade.code }}</td>
-                      <td>{{ trade.platform or '-' }}</td>
-                      <td>{{ trade.side }}</td>
-                      <td class="text-end">{{ trade.price }}</td>
-                      <td class="text-end">{{ trade.quantity }}</td>
-                      <td class="text-center">
-                        <a href="{{ url_for('crypto_edit_trade', index=loop.index0) }}" class="btn btn-sm btn-outline-primary me-1">编辑</a>
-                        <form method="post" action="{{ url_for('crypto_delete_trade', index=loop.index0) }}" style="display: inline;" onsubmit="return confirm('确定要删除这条交易记录吗？');">
-                          <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
-                        </form>
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
+                <tbody id="crypto-trades-tbody"></tbody>
               </table>
             </div>
-            <div id="no-results" class="alert alert-info" style="display: none;">
-              没有找到匹配的交易记录。
-            </div>
-          {% else %}
-            <p class="text-muted mb-0">暂时没有任何交易记录，请先新增一条交易。</p>
-          {% endif %}
+          </div>
+          <div data-fh-empty-state class="text-muted mb-0" style="display:none;">
+            暂时没有任何交易记录，请先新增一条交易。
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="modal fade" id="clearDataModal" tabindex="-1" aria-labelledby="clearDataModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="clearDataModalLabel">清除历史数据</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          此操作将删除所有 Crypto 历史交易记录，且无法恢复。是否确认继续？
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <form method="post" action="{{ url_for('crypto_clear_trades') }}" class="d-inline">
-            <button type="submit" class="btn btn-danger">确认清除</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      var searchInput = document.getElementById("search-input");
-      var clearBtn = document.getElementById("clear-search");
-      var resultCount = document.getElementById("search-result-count");
-      var tradesTbody = document.getElementById("trades-tbody");
-      var noResults = document.getElementById("no-results");
-      var sortAscBtn = document.getElementById("sort-date-asc");
-      var sortDescBtn = document.getElementById("sort-date-desc");
-
-      function parseDateValue(dateText) {
-        var s = (dateText || "").trim();
-        if (/^\d{8}$/.test(s)) return parseInt(s, 10);
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return parseInt(s.replace(/-/g, ""), 10);
-        return 0;
-      }
-
-      function sortRows(asc) {
-        if (!tradesTbody) return;
-        var rows = Array.from(tradesTbody.querySelectorAll("tr"));
-        rows.sort(function(a, b) {
-          var aDate = parseDateValue(a.cells[0].textContent);
-          var bDate = parseDateValue(b.cells[0].textContent);
-          return asc ? (aDate - bDate) : (bDate - aDate);
-        });
-        rows.forEach(function(r){ tradesTbody.appendChild(r); });
-      }
-      if (sortAscBtn) sortAscBtn.addEventListener("click", function(){ sortRows(true); });
-      if (sortDescBtn) sortDescBtn.addEventListener("click", function(){ sortRows(false); });
-
-      function doSearch() {
-        var term = (searchInput.value || "").trim().toLowerCase();
-          var rows = Array.from(tradesTbody.querySelectorAll("tr"));
-        var visible = 0;
-        rows.forEach(function(r) {
-          var code = r.cells[1].textContent.toLowerCase();
-            var match = code.includes(term);
-          r.style.display = match ? "" : "none";
-          if (match) visible++;
-        });
-        noResults.style.display = visible === 0 ? "block" : "none";
-        clearBtn.style.display = term ? "inline-block" : "none";
-        resultCount.textContent = term ? ("找到 " + visible + " 条记录") : "";
-      }
-      if (searchInput) searchInput.addEventListener("input", doSearch);
-      if (clearBtn) clearBtn.addEventListener("click", function(){ searchInput.value=""; doSearch(); });
-    });
-  </script>
 {% endblock %}

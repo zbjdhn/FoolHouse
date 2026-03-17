@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% set fh_page = "crypto_add" %}
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-lg-8 col-xl-6">
@@ -8,7 +9,7 @@
         <a href="{{ url_for('crypto_list_trades') }}" class="btn btn-sm btn-outline-secondary">交易列表</a>
       </div>
       <div class="card-body">
-        <form method="post" novalidate>
+        <form method="post" novalidate data-fh-trade-form>
           <div class="mb-3">
             <label for="date" class="form-label">成交日期</label>
             <input type="date" class="form-control{% if errors.date %} is-invalid{% endif %}" id="date" name="date" value="{{ form_data.date }}">

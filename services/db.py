@@ -83,6 +83,8 @@ def init_db():
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS trades (
                 id INT AUTO_INCREMENT PRIMARY KEY,
+                device_id VARCHAR(64),
+                client_id VARCHAR(64),
                 owner VARCHAR(255),
                 date VARCHAR(20),
                 code VARCHAR(20),
@@ -93,6 +95,69 @@ def init_db():
                 amount DECIMAL(18, 4),
                 amount_auto VARCHAR(10) DEFAULT '0',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+
+            # 尝试为已存在表补齐列（MySQL 支持 IF NOT EXISTS 取决于版本，这里用 try/except）
+            try:
+                cursor.execute("ALTER TABLE trades ADD COLUMN device_id VARCHAR(64)")
+            except Exception:
+                pass
+            try:
+                cursor.execute("ALTER TABLE trades ADD COLUMN client_id VARCHAR(64)")
+            except Exception:
+                pass
+            try:
+                cursor.execute("CREATE UNIQUE INDEX ux_trades_owner_client ON trades(owner, client_id)")
+            except Exception:
+                pass
+
+            # 原始记录表（A股）
+            logger.info("正在检查或创建数据库表 'equity_trade_raw'...")
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS equity_trade_raw (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                owner VARCHAR(255) NOT NULL,
+                device_id VARCHAR(64) NOT NULL,
+                client_id VARCHAR(64) NOT NULL,
+                op VARCHAR(16) NOT NULL,
+                raw_json JSON,
+                received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY ux_equity_raw_owner_client (owner, client_id)
+            )
+            """)
+
+            # Crypto 规范化表
+            logger.info("正在检查或创建数据库表 'crypto_trades'...")
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS crypto_trades (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                device_id VARCHAR(64),
+                client_id VARCHAR(64),
+                owner VARCHAR(255),
+                date VARCHAR(20),
+                code VARCHAR(32),
+                platform VARCHAR(64),
+                side VARCHAR(16),
+                price DECIMAL(18, 8),
+                quantity DECIMAL(18, 8),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY ux_crypto_owner_client (owner, client_id)
+            )
+            """)
+
+            # 原始记录表（Crypto）
+            logger.info("正在检查或创建数据库表 'crypto_trade_raw'...")
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS crypto_trade_raw (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                owner VARCHAR(255) NOT NULL,
+                device_id VARCHAR(64) NOT NULL,
+                client_id VARCHAR(64) NOT NULL,
+                op VARCHAR(16) NOT NULL,
+                raw_json JSON,
+                received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY ux_crypto_raw_owner_client (owner, client_id)
             )
             """)
 

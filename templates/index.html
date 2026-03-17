@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% set fh_page = "equity_add" %}
 
 {% block content %}
   <div class="row justify-content-center">
@@ -9,7 +10,7 @@
           <a href="{{ url_for('import_trades') }}" class="btn btn-sm btn-outline-secondary">批量导入</a>
         </div>
         <div class="card-body">
-          <form method="post" novalidate>
+          <form method="post" novalidate data-fh-trade-form>
             <div class="row mb-3">
               <div class="col-12">
                 <label for="code" class="form-label">证券代码</label>
@@ -310,7 +311,7 @@
             updateFieldsForSide();
           }
 
-          // 金额自动计算
+          // 金额自动计算（本地提交由前端 IndexedDB 处理，后端不会接收）
           function updateAmount() {
             if ((sideSelect && sideSelect.value === "红股入账") || amountInput.dataset.manual === "1") {
               return;

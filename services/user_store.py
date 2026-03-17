@@ -1,4 +1,3 @@
-import hashlib
 import pymysql
 import threading
 import os
@@ -11,8 +10,9 @@ from utils.logger import logger
 _USER_CACHE = {}
 _CACHE_LOCK = threading.RLock()
 
-# 默认密码从环境变量读取，如果没有则使用更安全的生成逻辑（非明文硬编码）
-DEFAULT_INIT_PWD = os.getenv("DEFAULT_USER_PASSWORD") or hashlib.sha256(b"foolhouse-default").hexdigest()[:12]
+def _env_flag(name: str) -> bool:
+    v = (os.getenv(name) or "").strip().lower()
+    return v in ("1", "true", "yes", "y", "on")
 
 def ensure_users_file() -> None:
     """
@@ -27,24 +27,44 @@ def ensure_users_file() -> None:
             # 1. 检查 admin 是否已存在
             cursor.execute("SELECT 1 FROM users WHERE username = 'admin'")
             admin_exists = cursor.fetchone()
-            
+
+            admin_pwd = (os.getenv("ADMIN_PASSWORD") or "").strip()
+            ada_pwd = (os.getenv("ADA_PASSWORD") or "").strip()
+
             if not admin_exists:
-                # 初始管理员密码：优先读取环境变量 ADMIN_PASSWORD，否则使用默认安全逻辑
-                admin_pwd = os.getenv("ADMIN_PASSWORD") or DEFAULT_INIT_PWD
-                ada_pwd = os.getenv("ADA_PASSWORD") or DEFAULT_INIT_PWD
-                
-                users = [
-                    ("admin", hash_password(admin_pwd), True),
-                    ("ada", hash_password(ada_pwd), False),
-                ]
-                cursor.executemany(
-                    "INSERT INTO users (username, password_hash, is_admin) VALUES (%s, %s, %s)",
-                    users
-                )
+                # 初始化必须显式配置密码，避免代码内置默认值导致无法登录/不安全
+                if not admin_pwd:
+                    raise RuntimeError(
+                        "缺少环境变量 ADMIN_PASSWORD：无法初始化 admin 用户。请在环境变量中设置 ADMIN_PASSWORD 后重启。"
+                    )
+                if not ada_pwd:
+                    # 允许不创建 ada（或由管理员后台创建），避免隐式默认密码
+                    logger.warning("未设置 ADA_PASSWORD，将只创建 admin 用户。")
+                    users = [("admin", hash_password(admin_pwd), True)]
+                    cursor.executemany(
+                        "INSERT INTO users (username, password_hash, is_admin) VALUES (%s, %s, %s)",
+                        users,
+                    )
+                else:
+                    users = [
+                        ("admin", hash_password(admin_pwd), True),
+                        ("ada", hash_password(ada_pwd), False),
+                    ]
+                    cursor.executemany(
+                        "INSERT INTO users (username, password_hash, is_admin) VALUES (%s, %s, %s)",
+                        users,
+                    )
                 conn.commit()
-                
-                status_msg = "源自环境变量" if os.getenv("ADMIN_PASSWORD") else "使用动态生成的默认密码"
-                logger.info(f"数据库初始化成功，已创建默认用户（管理员密码{status_msg}）。")
+                logger.info("数据库初始化成功，已创建默认用户（密码源自环境变量）。")
+            else:
+                # 可选：通过环境变量强制重置 admin 密码（用于修复“无法登录”）
+                if admin_pwd and _env_flag("ADMIN_PASSWORD_FORCE_RESET"):
+                    cursor.execute(
+                        "UPDATE users SET password_hash=%s WHERE username='admin'",
+                        (hash_password(admin_pwd),),
+                    )
+                    conn.commit()
+                    logger.warning("已根据环境变量强制重置 admin 密码（ADMIN_PASSWORD_FORCE_RESET=1）。")
             
             # 2. 预加载所有用户信息到缓存
             cursor.execute("SELECT * FROM users")

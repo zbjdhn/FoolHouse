@@ -13,7 +13,7 @@
     />
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   </head>
-  <body>
+  <body data-fh-owner="{{ session.get('user') or '' }}" data-fh-is-admin="{{ '1' if session.get('is_admin') else '0' }}" data-fh-page="{{ fh_page|default('') }}">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 sticky-top">
       <div class="container-fluid">
         <a class="navbar-brand p-0 fh-brand-lockup" href="{{ url_for('index') }}">
@@ -47,13 +47,18 @@
           {% endif %}
           <ul class="navbar-nav ms-auto align-items-center">
             {% if session.get('user') %}
+              <li class="nav-item me-2">
+                <button class="nav-control-btn nav-embed" type="button" data-fh-sync-btn>
+                  同步
+                  <span class="badge bg-warning text-dark ms-1" data-fh-sync-badge style="display:none;">0</span>
+                </button>
+              </li>
               <li class="nav-item dropdown me-2">
-                <a class="nav-link dropdown-toggle nav-control-btn nav-embed" href="#" id="langDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-translate me-1" viewBox="0 0 16 16">
+                <a class="nav-link dropdown-toggle nav-icon-only" href="#" id="langDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-translate" viewBox="0 0 16 16">
                     <path d="M4.545 6.714 4.11 8H3l1.862-5h1.284L8 8H6.833l-.435-1.286zm1.634-.736L5.5 3.956h-.049l-.679 2.022z"/>
                     <path d="M0 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zm7.138 9.995q.289.451.63.846c-.197.154-.467.264-.767.339h-.133a1 1 0 0 0-.113.013L8 11.239V10h1zm.613-1.583q-.278-.446-.52-.858H7.031L5.641 8H4.11l.505 1.5H5.7l.333-1h1.232l.333 1z"/>
                   </svg>
-                  <span class="small">{{ t('nav_lang_zh') if lang == 'zh' else t('nav_lang_en') }}</span>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="langDropdown">
                   <li><a class="dropdown-item py-1 px-3 small{% if lang == 'zh' %} active{% endif %}" href="{{ url_for('switch_lang', lang='zh', next=request.full_path) }}">{{ t('nav_lang_zh') }}</a></li>
@@ -61,7 +66,7 @@
                 </ul>
               </li>
               <li class="nav-item me-2">
-                <button class="nav-control-btn nav-control-btn--icon nav-embed" type="button" aria-label="Toggle theme" data-theme-toggle>
+                <button class="nav-icon-only" type="button" aria-label="Toggle theme" data-theme-toggle>
                   <span class="theme-toggle-icon theme-toggle-sun" aria-hidden="true">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                       <path d="M8 1.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 8 1.75zm0 12.5a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75zm6.25-6a.75.75 0 0 1-.75.75v.5a.75.75 0 0 1-1.5 0v-.5a.75.75 0 0 1 1.5 0v-.5a.75.75 0 0 1 .75-.75zm-12.5 0a.75.75 0 0 1-.75.75v.5a.75.75 0 0 1-1.5 0v-.5A.75.75 0 0 1 1.75 7.5zm8.96-4.71a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zm-8.48 8.48a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zm8.48 1.42a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zm-8.48-8.48a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zM8 4.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z"/>
@@ -124,12 +129,11 @@
               </li>
             {% else %}
               <li class="nav-item dropdown me-2">
-                <a class="nav-link dropdown-toggle nav-control-btn nav-embed" href="#" id="guestLangDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-translate me-1" viewBox="0 0 16 16">
+                <a class="nav-link dropdown-toggle nav-icon-only" href="#" id="guestLangDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-translate" viewBox="0 0 16 16">
                     <path d="M4.545 6.714 4.11 8H3l1.862-5h1.284L8 8H6.833l-.435-1.286zm1.634-.736L5.5 3.956h-.049l-.679 2.022z"/>
                     <path d="M0 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zm7.138 9.995q.289.451.63.846c-.197.154-.467.264-.767.339h-.133a1 1 0 0 0-.113.013L8 11.239V10h1zm.613-1.583q-.278-.446-.52-.858H7.031L5.641 8H4.11l.505 1.5H5.7l.333-1h1.232l.333 1z"/>
                   </svg>
-                  <span class="small">{{ t('nav_lang_zh') if lang == 'zh' else t('nav_lang_en') }}</span>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="guestLangDropdown">
                   <li><a class="dropdown-item py-1 px-3 small{% if lang == 'zh' %} active{% endif %}" href="{{ url_for('switch_lang', lang='zh', next=request.full_path) }}">{{ t('nav_lang_zh') }}</a></li>
@@ -137,7 +141,7 @@
                 </ul>
               </li>
               <li class="nav-item me-2">
-                <button class="nav-control-btn nav-control-btn--icon nav-embed" type="button" aria-label="Toggle theme" data-theme-toggle>
+                <button class="nav-icon-only" type="button" aria-label="Toggle theme" data-theme-toggle>
                   <span class="theme-toggle-icon theme-toggle-sun" aria-hidden="true">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                       <path d="M8 1.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 8 1.75zm0 12.5a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75zm6.25-6a.75.75 0 0 1-.75.75v.5a.75.75 0 0 1-1.5 0v-.5a.75.75 0 0 1 1.5 0v-.5a.75.75 0 0 1 .75-.75zm-12.5 0a.75.75 0 0 1-.75.75v.5a.75.75 0 0 1-1.5 0v-.5A.75.75 0 0 1 1.75 7.5zm8.96-4.71a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zm-8.48 8.48a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zm8.48 1.42a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zm-8.48-8.48a.75.75 0 0 1 1.06 0l.36.36a.75.75 0 1 1-1.06 1.06l-.36-.36a.75.75 0 0 1 0-1.06zM8 4.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z"/>
@@ -202,6 +206,7 @@
               </div>
             {% endif %}
           {% endwith %}
+          <div data-fh-flash-host></div>
           {% block content %}{% endblock %}
         </section>
       </div>
@@ -212,6 +217,11 @@
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
+    <script src="{{ url_for('static', filename='idb.js') }}"></script>
+    <script src="{{ url_for('static', filename='equity_ui.js') }}"></script>
+    <script src="{{ url_for('static', filename='crypto_ui.js') }}"></script>
+    <script src="{{ url_for('static', filename='excel_import.js') }}"></script>
+    <script src="{{ url_for('static', filename='sync.js') }}"></script>
     <script>
       (function() {
         var storageKey = "fh-theme";

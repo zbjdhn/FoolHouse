@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% set fh_page = "crypto_import" %}
 
 {% block content %}
   <div class="row justify-content-center">
@@ -28,7 +29,8 @@
             </ul>
           </div>
 
-          <form method="post" enctype="multipart/form-data">
+          <script src="https://cdn.jsdelivr.net/npm/xlsx@0.20.2/dist/xlsx.full.min.js"></script>
+          <form method="post" enctype="multipart/form-data" data-fh-import-form>
             <div class="mb-3">
               <label for="file" class="form-label">选择Excel文件</label>
               <input
@@ -50,33 +52,7 @@
             <a href="{{ url_for('crypto_list_trades') }}" class="btn btn-secondary">取消</a>
           </form>
 
-          {% if errors %}
-            <div class="mt-4">
-              <h5>导入结果</h5>
-              {% if summary %}
-                <div class="alert alert-{% if summary.error_count == 0 %}success{% else %}warning{% endif %}">
-                  <strong>总计：</strong>{{ summary.total_rows }} 行
-                  {% if summary.success_count > 0 %}
-                    | <strong>成功：</strong>{{ summary.success_count }} 条
-                  {% endif %}
-                  {% if summary.error_count > 0 %}
-                    | <strong>错误：</strong>{{ summary.error_count }} 条
-                  {% endif %}
-                </div>
-              {% endif %}
-
-              {% if errors|length > 0 %}
-                <div class="alert alert-danger">
-                  <h6 class="alert-heading">错误详情：</h6>
-                  <ul class="mb-0" style="max-height: 300px; overflow-y: auto;">
-                    {% for error in errors %}
-                      <li>{{ error }}</li>
-                    {% endfor %}
-                  </ul>
-                </div>
-              {% endif %}
-            </div>
-          {% endif %}
+          <div class="mt-4" data-fh-import-result></div>
         </div>
       </div>
     </div>

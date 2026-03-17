@@ -1,6 +1,7 @@
 import os
 from datetime import date, datetime
 import json
+import csv
 from werkzeug.utils import secure_filename
 
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, session
@@ -18,6 +19,7 @@ import services.analysis as analysis
 import services.snapshot_store as snapshot_store
 import services.crypto_tokens_store as crypto_tokens
 import services.i18n as i18n
+import services.sync_store as sync_store
 from utils.date_utils import format_date_to_str
 from utils.logger import logger
 
@@ -325,6 +327,86 @@ def api_get_total_assets_snapshot():
     if v is None:
         return jsonify({})
     return jsonify({"total_assets": v})
+
+
+@app.get("/api/bootstrap")
+def api_bootstrap():
+    """
+    One-time bootstrap payload for local-first IndexedDB.
+    Returns both equity and crypto records for the current user.
+    """
+    need = require_login()
+    if need:
+        return need
+    owner = session.get("user")
+    equity = trade_store.load_trades(owner=owner)
+    crypto = crypto_store.load_trades(owner=owner)
+    # Map server-side rows to client format (clientId may not exist yet)
+    eq_out = []
+    for t in equity:
+        eq_out.append(
+            {
+                "clientId": (t.get("client_id") or t.get("clientId") or ""),
+                "date": t.get("date") or "",
+                "code": t.get("code") or "",
+                "name": t.get("name") or "",
+                "side": t.get("side") or "",
+                "price": str(t.get("price") or ""),
+                "quantity": str(t.get("quantity") or ""),
+                "amount": str(t.get("amount") or ""),
+                "amountAuto": str(t.get("amount_auto") or t.get("amountAuto") or "0"),
+            }
+        )
+    cr_out = []
+    for t in crypto:
+        cr_out.append(
+            {
+                "clientId": (t.get("client_id") or t.get("clientId") or ""),
+                "date": t.get("date") or "",
+                "code": (t.get("code") or "").upper(),
+                "platform": t.get("platform") or "",
+                "side": t.get("side") or "",
+                "price": str(t.get("price") or ""),
+                "quantity": str(t.get("quantity") or ""),
+            }
+        )
+    return jsonify({"equity": eq_out, "crypto": cr_out})
+
+
+@app.post("/api/sync/equity")
+def api_sync_equity():
+    need = require_login()
+    if need:
+        return jsonify({"error": "not_logged_in"}), 401
+    owner = session.get("user")
+    body = request.get_json(silent=True) or {}
+    device_id = (body.get("deviceId") or "").strip()
+    records = body.get("records") or []
+    if not device_id:
+        return jsonify({"error": "missing deviceId"}), 400
+    if not isinstance(records, list):
+        return jsonify({"error": "records must be a list"}), 400
+
+    accepted, errors = sync_store.upsert_equity_raw_and_normalized(owner, device_id, records)
+    return jsonify({"accepted": accepted, "errors": errors})
+
+
+@app.post("/api/sync/crypto")
+def api_sync_crypto():
+    need = require_login()
+    if need:
+        return jsonify({"error": "not_logged_in"}), 401
+    owner = session.get("user")
+    body = request.get_json(silent=True) or {}
+    device_id = (body.get("deviceId") or "").strip()
+    records = body.get("records") or []
+    if not device_id:
+        return jsonify({"error": "missing deviceId"}), 400
+    if not isinstance(records, list):
+        return jsonify({"error": "records must be a list"}), 400
+
+    accepted, errors = sync_store.upsert_crypto_raw_and_normalized(owner, device_id, records)
+    return jsonify({"accepted": accepted, "errors": errors})
 
 
 @app.route("/export")

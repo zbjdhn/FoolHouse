@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% set fh_page = "equity_list" %}
 
 {% block content %}
   <div class="row">
@@ -7,19 +8,14 @@
         <div class="card-header d-flex justify-content-between align-items-center">
           <span>交易列表</span>
           <div>
-            {% if trades %}
-              <a href="{{ url_for('export_trades') }}" class="btn btn-sm btn-outline-success me-2">
-                导出全部
-              </a>
-              <button type="button" class="btn btn-sm btn-outline-danger me-2" data-bs-toggle="modal" data-bs-target="#clearDataModal">
-                清除历史数据
-              </button>
-            {% endif %}
+            <a href="{{ url_for('export_trades') }}" class="btn btn-sm btn-outline-success me-2">
+              导出全部
+            </a>
             <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-primary">新增交易</a>
           </div>
         </div>
         <div class="card-body">
-          {% if trades %}
+          <div data-fh-table-state>
             <div class="mb-3 d-flex align-items-center gap-2">
               <input
                 type="text"
@@ -53,263 +49,18 @@
                     <th class="text-center">操作</th>
                   </tr>
                 </thead>
-                <tbody id="trades-tbody">
-                  {% for trade in trades %}
-                    <tr data-code="{{ trade.code }}" data-index="{{ loop.index0 }}">
-                      <td>{{ trade.date }}</td>
-                      <td>
-                        <a href="#" class="code-filter-link text-decoration-none" data-code="{{ trade.code }}">{{ trade.code }}</a>
-                      </td>
-                      <td class="stock-name-cell" data-code="{{ trade.code }}">
-                        {% if trade.name %}
-                          <span class="stock-name-placeholder">{{ trade.name }}</span>
-                        {% else %}
-                          <span class="stock-name-placeholder text-muted">加载中...</span>
-                        {% endif %}
-                      </td>
-                      <td>{{ trade.side }}</td>
-                      <td class="text-end">
-                        {% if trade.side == "红股入账" %}
-                          -
-                        {% else %}
-                          {{ trade.price }}
-                        {% endif %}
-                      </td>
-                      <td class="text-end">{{ trade.quantity }}</td>
-                      <td class="text-end">
-                        {% if trade.side == "红股入账" %}
-                          -
-                        {% else %}
-                          {{ trade.amount }}
-                          {% if trade.amount_auto in ["1","true","True","TRUE"] %}
-                            <span
-                              class="badge bg-warning text-dark ms-1 align-middle"
-                              data-bs-toggle="tooltip"
-                              data-bs-placement="top"
-                              title="该发生金额由成交价格×成交数量自动计算，未含手续费"
-                              aria-label="自动计算提示"
-                            >!</span>
-                          {% endif %}
-                        {% endif %}
-                      </td>
-                      <td class="text-end">
-                        {% if trade.side == "红股入账" %}
-                          -
-                        {% else %}
-                          {% set amt = (trade.amount | float) %}
-                          {% set qty = (trade.quantity | int) %}
-                          {% set pr = (trade.price | float) %}
-                          {% set fee = ( (amt | abs) - (pr * qty) ) | abs %}
-                          {{ '%.2f' | format(fee) }}
-                        {% endif %}
-                      </td>
-                      <td class="text-center">
-                        <a href="{{ url_for('edit_trade', index=loop.index0) }}" class="btn btn-sm btn-outline-primary me-1">编辑</a>
-                        <form method="post" action="{{ url_for('delete_trade', index=loop.index0) }}" style="display: inline;" onsubmit="return confirm('确定要删除这条交易记录吗？');">
-                          <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
-                        </form>
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
+                <tbody id="trades-tbody"></tbody>
               </table>
             </div>
             <div id="no-results" class="alert alert-info" style="display: none;">
               没有找到匹配的交易记录。
             </div>
-          {% else %}
-            <p class="text-muted mb-0">暂时没有任何交易记录，请先新增一条交易。</p>
-          {% endif %}
+          </div>
+          <div data-fh-empty-state class="text-muted mb-0" style="display:none;">
+            暂时没有任何交易记录，请先新增一条交易。
+          </div>
         </div>
       </div>
     </div>
   </div>
-
-  <div class="modal fade" id="clearDataModal" tabindex="-1" aria-labelledby="clearDataModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="clearDataModalLabel">清除历史数据</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          此操作将删除所有历史交易记录，且无法恢复。是否确认继续？
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <form method="post" action="{{ url_for('clear_trades') }}" class="d-inline">
-            <button type="submit" class="btn btn-danger">确认清除</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      var searchInput = document.getElementById("search-input");
-      var clearBtn = document.getElementById("clear-search");
-      var resultCount = document.getElementById("search-result-count");
-      var tradesTbody = document.getElementById("trades-tbody");
-      var sortAscBtn = document.getElementById("sort-date-asc");
-      var sortDescBtn = document.getElementById("sort-date-desc");
-      var noResults = document.getElementById("no-results");
-      var allRows = tradesTbody ? Array.from(tradesTbody.querySelectorAll("tr")) : [];
-      
-      // 存储股票名称的缓存
-      var stockNameCache = {};
-      var loadingCodes = new Set();
-      
-      // 加载所有股票名称（若存储中已有名称则跳过）
-      function loadStockNames() {
-        if (!tradesTbody) return;
-        
-        var codeCells = tradesTbody.querySelectorAll(".stock-name-cell");
-        codeCells.forEach(function(cell) {
-          var code = cell.getAttribute("data-code");
-          var placeholder = cell.querySelector(".stock-name-placeholder");
-          var alreadyHasName = placeholder && !placeholder.classList.contains("text-muted");
-          if (!code || alreadyHasName || stockNameCache[code] || loadingCodes.has(code)) {
-            return;
-          }
-          
-          loadingCodes.add(code);
-          fetch("/api/stock/" + encodeURIComponent(code))
-            .then(function(response) {
-              return response.json();
-            })
-            .then(function(data) {
-              loadingCodes.delete(code);
-              if (data.name) {
-                stockNameCache[code] = data.name;
-                cell.querySelector(".stock-name-placeholder").textContent = data.name;
-                cell.querySelector(".stock-name-placeholder").classList.remove("text-muted");
-              } else {
-                cell.querySelector(".stock-name-placeholder").textContent = "-";
-              }
-            })
-            .catch(function(error) {
-              loadingCodes.delete(code);
-              cell.querySelector(".stock-name-placeholder").textContent = "-";
-            });
-        });
-      }
-      
-      // 初始加载股票名称
-      loadStockNames();
-      
-      // 搜索功能
-      function performSearch() {
-        var searchTerm = (searchInput.value || "").trim().toLowerCase();
-        
-        if (!searchTerm) {
-          // 显示所有行
-          allRows.forEach(function(row) {
-            row.style.display = "";
-          });
-          clearBtn.style.display = "none";
-          resultCount.textContent = "";
-          noResults.style.display = "none";
-          return;
-        }
-        
-        var visibleCount = 0;
-        allRows.forEach(function(row) {
-          var code = row.getAttribute("data-code") || "";
-          var nameCell = row.querySelector(".stock-name-cell");
-          var name = nameCell ? stockNameCache[code] || "" : "";
-          
-          var codeMatch = code.toLowerCase().includes(searchTerm);
-          var nameMatch = name && name.toLowerCase().includes(searchTerm);
-          
-          if (codeMatch || nameMatch) {
-            row.style.display = "";
-            visibleCount++;
-          } else {
-            row.style.display = "none";
-          }
-        });
-        
-        // 更新UI
-        if (visibleCount === 0) {
-          noResults.style.display = "block";
-        } else {
-          noResults.style.display = "none";
-        }
-        
-        clearBtn.style.display = "inline-block";
-        resultCount.textContent = "找到 " + visibleCount + " 条记录";
-      }
-      
-      // 解析日期为可排序数值（YYYYMMDD）
-      function parseDateValue(dateText) {
-        var s = (dateText || "").trim();
-        if (/^\d{8}$/.test(s)) {
-          return parseInt(s, 10);
-        }
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-          return parseInt(s.replace(/-/g, ""), 10);
-        }
-        return 0;
-      }
-      
-      // 排序功能
-      function sortRows(asc) {
-        if (!tradesTbody) return;
-        var rows = Array.from(tradesTbody.querySelectorAll("tr"));
-        rows.sort(function(a, b) {
-          var da = parseDateValue(a.cells[0].textContent);
-          var db = parseDateValue(b.cells[0].textContent);
-          return asc ? (da - db) : (db - da);
-        });
-        rows.forEach(function(r) { tradesTbody.appendChild(r); });
-        allRows = rows;
-      }
-      
-      if (sortAscBtn) {
-        sortAscBtn.addEventListener("click", function() {
-          sortRows(true);
-          performSearch();
-        });
-      }
-      if (sortDescBtn) {
-        sortDescBtn.addEventListener("click", function() {
-          sortRows(false);
-          performSearch();
-        });
-      }
-      
-      // 点击代码触发筛选
-      tradesTbody.addEventListener("click", function(e) {
-        var target = e.target;
-        if (target && target.classList.contains("code-filter-link")) {
-          e.preventDefault();
-          var code = target.getAttribute("data-code") || "";
-          searchInput.value = code;
-          performSearch();
-        }
-      });
-      
-      // 监听搜索输入
-      if (searchInput) {
-        searchInput.addEventListener("input", function() {
-          performSearch();
-        });
-      }
-      
-      // 清除搜索
-      if (clearBtn) {
-        clearBtn.addEventListener("click", function() {
-          searchInput.value = "";
-          performSearch();
-        });
-      }
-      
-      // 初始化工具提示
-      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-      tooltipTriggerList.forEach(function (tooltipTriggerEl) {
-        new bootstrap.Tooltip(tooltipTriggerEl);
-      });
-    });
-  </script>
 {% endblock %}
